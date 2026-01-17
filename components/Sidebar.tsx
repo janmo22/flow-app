@@ -34,9 +34,7 @@ const researchNav = [
     { icon: Sparkles, label: "Inspiración", href: "/inspiration" },
 ];
 
-const configNav = [
-    { icon: Trash2, label: "Papelera", href: "/trash" },
-];
+const configNav: { icon: any; label: string; href: string }[] = [];
 
 export function Sidebar() {
     const pathname = usePathname();
@@ -100,14 +98,7 @@ export function Sidebar() {
                     ))}
                 </div>
 
-                <div className="space-y-1">
-                    <div className="px-3 pb-1 pt-2">
-                        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-[0.15em]">Configuración</span>
-                    </div>
-                    {configNav.map(item => (
-                        <NavItem key={item.href} item={item} pathname={pathname} />
-                    ))}
-                </div>
+                {/* Config section removed */}
             </div>
 
             {/* Footer */}
