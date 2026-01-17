@@ -1,26 +1,144 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  --color-primary: #09090b;
+  /* Deep Black Text (Zinc 950) */
+  --color-secondary: #52525b;
+  /* Zinc 600 for secondary text */
+  --color-tertiary: #a1a1aa;
+  /* Zinc 400 for placeholders/icons */
+
+  --color-brand: #2563EB;
+  /* Professional Electric Blue (Blue 600) */
+  --color-brand-dark: #1d4ed8;
+  /* Blue 700 */
+  --color-brand-light: #EFF6FF;
+  /* Blue 50 */
+  --color-brand-subtle: #dbOafe;
+  /* Blue 100 approx */
+
+  --color-background: #FBFBFB;
+  /* Off-white background for app depth */
+  --color-surface: #FFFFFF;
+  /* Pure white for cards */
+
+  --color-border: #E4E4E7;
+  /* Zinc 200 */
+  --color-border-hover: #d4d4d8;
+  /* Zinc 300 */
+
+  --font-sans: var(--font-inter);
+
+  --shadow-soft: 0 2px 10px rgba(0, 0, 0, 0.03);
+  --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  --shadow-raised: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+@layer base {
+  body {
+    @apply bg-[var(--color-background)] text-[var(--color-primary)] antialiased font-sans selection:bg-[#2563EB]/10 selection:text-[#2563EB];
+  }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  /* Hierarchy Standards */
+  h1 {
+    @apply text-3xl md:text-4xl font-extrabold tracking-tight text-[var(--color-primary)];
+  }
+
+  h2 {
+    @apply text-xl md:text-2xl font-bold tracking-tight text-[var(--color-primary)];
+  }
+
+  h3 {
+    @apply text-lg font-bold tracking-tight text-[var(--color-primary)];
+  }
+
+  p {
+    @apply text-sm md:text-[15px] leading-relaxed text-[var(--color-secondary)];
+  }
+
+  /* Form Elements Base Reset */
+  input,
+  textarea,
+  select {
+    @apply text-sm outline-none placeholder:text-[var(--color-tertiary)];
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer utilities {
+
+  /* Layout Standards */
+  .page-container {
+    @apply max-w-[1200px] mx-auto w-full px-6 md:px-8 py-8 md:py-12;
+  }
+
+  /* Component Utilities */
+  .pro-card {
+    @apply bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl shadow-[var(--shadow-card)] transition-all duration-300;
+  }
+
+  .pro-card-hover {
+    @apply hover:border-[var(--color-border-hover)] hover:shadow-[var(--shadow-raised)];
+  }
+
+  .pro-label {
+    @apply block text-[11px] font-bold text-[var(--color-tertiary)] uppercase tracking-wider mb-2.5;
+  }
+
+  .btn-primary {
+    @apply bg-[var(--color-brand)] text-white rounded-xl px-5 py-2.5 font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 hover:bg-[var(--color-brand-dark)] hover:shadow-blue-500/40 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 transition-all duration-200 ease-out disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  .btn-secondary {
+    @apply bg-white border border-[var(--color-border)] text-[var(--color-primary)] rounded-xl px-5 py-2.5 font-bold text-sm flex items-center justify-center gap-2 hover:bg-zinc-50 hover:text-black transition-all duration-200 ease-out active:scale-95;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-zinc-200 rounded-full;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    @apply bg-zinc-300;
+  }
+
+  /* MILLION EURO ANIMATIONS */
+  @keyframes enter-smooth {
+    0% {
+      opacity: 0;
+      transform: translateY(12px) scale(0.99);
+      filter: blur(4px);
+    }
+
+    100% {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      filter: blur(0);
+    }
+  }
+
+  .animate-enter {
+    animation: enter-smooth 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    will-change: transform, opacity, filter;
+  }
+
+  /* Delays */
+  .delay-100 {
+    animation-delay: 100ms;
+  }
+
+  .delay-200 {
+    animation-delay: 200ms;
+  }
+
+  .delay-300 {
+    animation-delay: 300ms;
+  }
 }
