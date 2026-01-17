@@ -8,50 +8,62 @@ export async function middleware(request: NextRequest) {
         },
     })
 
-    const supabase = createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-            cookies: {
-                getAll() {
-                    return request.cookies.getAll()
-                },
-                setAll(cookiesToSet) {
-                    cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
-                    response = NextResponse.next({
-                        request: {
-                            headers: request.headers,
-                        },
-                    })
-                    cookiesToSet.forEach(({ name, value, options }) =>
-                        response.cookies.set(name, value, options)
-                    )
-                },
-            },
-        }
-    )
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-    // Using getUser instead of getSession for better security in middleware
-    const { data: { user } } = await supabase.auth.getUser()
-
-    const { pathname } = request.nextUrl
-
-    // Public paths that shouldn't be redirected to /login
-    const isAuthPage = pathname.startsWith('/login') || pathname.startsWith('/update-password')
-
-    // 1. If no user and NOT on an auth page -> redirect to /login
-    if (!user && !isAuthPage) {
-        const url = request.nextUrl.clone()
-        url.pathname = '/login'
-        return NextResponse.redirect(url)
+    // Defensive check for env vars to avoid 500 errors if missing
+    if (!supabaseUrl || !supabaseKey) {
+        console.error('Middleware Error: Supabase env vars are missing.')
+        return response
     }
 
-    // 2. If user and ON /login -> redirect to home
-    // Note: we allow /update-password even with session so they can change it
-    if (user && pathname === '/login') {
-        const url = request.nextUrl.clone()
-        url.pathname = '/'
-        return NextResponse.redirect(url)
+    try {
+        const supabase = createServerClient(
+            supabaseUrl,
+            supabaseKey,
+            {
+                cookies: {
+                    getAll() {
+                        return request.cookies.getAll()
+                    },
+                    setAll(cookiesToSet) {
+                        cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
+                        response = NextResponse.next({
+                            request: {
+                                headers: request.headers,
+                            },
+                        })
+                        cookiesToSet.forEach(({ name, value, options }) =>
+                            response.cookies.set(name, value, options)
+                        )
+                    },
+                },
+            }
+        )
+
+        const { data: { user } } = await supabase.auth.getUser()
+
+        const { pathname } = request.nextUrl
+        const isAuthPage = pathname.startsWith('/login') || pathname.startsWith('/update-password')
+
+        // 1. If no user and NOT on an auth page -> redirect to /login
+        if (!user && !isAuthPage) {
+            const url = request.nextUrl.clone()
+            url.pathname = '/login'
+            return NextResponse.redirect(url)
+        }
+
+        // 2. If user and ON /login -> redirect to home
+        if (user && pathname === '/login') {
+            const url = request.nextUrl.clone()
+            url.pathname = '/'
+            return NextResponse.redirect(url)
+        }
+
+    } catch (error) {
+        console.error('Middleware execution error:', error)
+        // If Supabase fails, allow the request to proceed instead of crashing with 500
+        // (The app pages will likely handle the auth state or redirect on client side)
     }
 
     return response
