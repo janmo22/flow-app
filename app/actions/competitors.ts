@@ -20,20 +20,29 @@ export async function addCompetitor(usernameOrUrl: string) {
     let username = usernameOrUrl.trim()
     let url = usernameOrUrl.trim()
 
-    // Simple URL check
-    if (!username.startsWith('http')) {
+    // Simple URL check - if not http, treat as username
+    if (!username.startsWith('http') && !username.startsWith('www.')) {
+        username = username.replace('@', '')
         url = `https://instagram.com/${username}`
     } else {
         try {
-            const urlObj = new URL(username)
+            // Handle full URLs
+            let cleanUrl = username
+            if (!cleanUrl.startsWith('http')) {
+                cleanUrl = `https://${cleanUrl}`
+            }
+            const urlObj = new URL(cleanUrl)
             const pathParts = urlObj.pathname.split('/').filter(p => p)
             if (pathParts.length > 0) {
                 username = pathParts[0]
             }
+            url = cleanUrl
         } catch (e) {
-            // keep as is
+            // Fallback if URL parsing fails but input looks like URL
         }
     }
+
+    // Final cleanup
     username = username.replace('@', '').replace('https://', '').replace('www.', '').replace('instagram.com/', '').split('/')[0]
 
     // Insert into DB (Simple Manual Entry)
@@ -44,8 +53,7 @@ export async function addCompetitor(usernameOrUrl: string) {
             name: username,
             username: username,
             url: url,
-            status: 'manual', // No 'pending_scrape'
-            // Default empty stats to avoid null issues if displayed
+            status: 'manual',
             followers: 0,
             posts_count: 0,
             profile_pic_url: null
@@ -54,8 +62,16 @@ export async function addCompetitor(usernameOrUrl: string) {
         .single()
 
     if (insertError) {
+        // Handle duplicate key error gracefully
+        if (insertError.code === '23505') {
+            return { error: 'Este competidor ya existe.' }
+        }
         return { error: insertError.message }
     }
+
+    // Trigger auto-sync immediately (Fire and forget, or await if fast enough)
+    // We await it here to try to get immediate data if available in Apify runs
+    await syncCompetitorData(competitor.id)
 
     revalidatePath('/competencia')
     return { success: true, competitorId: competitor.id }

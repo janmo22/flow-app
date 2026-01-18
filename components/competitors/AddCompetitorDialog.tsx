@@ -79,13 +79,13 @@ export function AddCompetitorDialog() {
                     <div className="space-y-4">
                         <div>
                             <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">
-                                Enlace de Instagram
+                                Enlace de Instagram o Usuario
                             </label>
                             <div className="relative">
                                 <LinkIcon className="absolute left-3 top-3 w-4 h-4 text-zinc-400 pointer-events-none" />
                                 <input
                                     type="text"
-                                    placeholder="https://instagram.com/usuario"
+                                    placeholder="ej. @usuario o enlace completo"
                                     className="w-full bg-white border border-zinc-200 rounded-lg py-2.5 pl-9 pr-3 text-sm font-medium text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-900 transition-all"
                                     value={url}
                                     onChange={(e) => setUrl(e.target.value)}
