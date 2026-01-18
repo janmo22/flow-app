@@ -281,17 +281,14 @@ export default function CalendarPage() {
 
                 {/* SIDEBAR STATUS */}
                 <div className="w-80 flex flex-col gap-6 shrink-0 min-h-0">
-                    <div className="bg-white border border-zinc-200 rounded-[32px] p-8 relative overflow-hidden shadow-xl shadow-zinc-200/50 group shrink-0">
-                        <div className="absolute top-0 right-0 w-40 h-40 bg-blue-50/50 blur-[60px] group-hover:bg-blue-100/50 transition-all duration-700" />
+                    <div className="bg-white border border-zinc-200 rounded-[24px] p-6 relative overflow-hidden shadow-xl shadow-zinc-200/50 group shrink-0 h-40 flex flex-col justify-center">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50/50 blur-[50px] group-hover:bg-blue-100/50 transition-all duration-700" />
                         <div className="relative z-10">
-                            <div className="flex items-center gap-3 mb-6">
-                                <div className="w-11 h-11 rounded-2xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/20 group-hover:scale-110 transition-transform">
-                                    <Zap className="w-5 h-5 text-white" />
-                                </div>
-                                <span className="text-[10px] font-black uppercase tracking-[0.25em] text-zinc-400">Status Semanal</span>
+                            <div className="flex items-center gap-3 mb-2">
+                                <span className="text-[9px] font-black uppercase tracking-[0.25em] text-zinc-400">Status Semanal</span>
                             </div>
-                            <h3 className="text-4xl font-black tracking-tighter mb-2 text-zinc-900">3 Publicaciones</h3>
-                            <p className="text-xs text-zinc-500 font-medium leading-relaxed">Tu calendario está optimizado para el algoritmo actual. <span className="text-blue-600 font-bold">¡Buen trabajo!</span></p>
+                            <h3 className="text-3xl font-black tracking-tighter mb-1 text-zinc-900">3 Posts</h3>
+                            <p className="text-[10px] text-zinc-500 font-medium leading-relaxed">Algoritmo optimizado. <span className="text-blue-600 font-bold">¡Bien!</span></p>
                         </div>
                     </div>
 

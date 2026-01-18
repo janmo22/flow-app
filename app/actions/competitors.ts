@@ -16,31 +16,39 @@ export async function addCompetitor(usernameOrUrl: string) {
         return { error: 'Unauthorized' }
     }
 
-    // Extract username from URL or plain text
+    // Extract username/name
     let username = usernameOrUrl.trim()
-    try {
-        if (username.includes('instagram.com/')) {
+    let url = usernameOrUrl.trim()
+
+    // Simple URL check
+    if (!username.startsWith('http')) {
+        url = `https://instagram.com/${username}`
+    } else {
+        try {
             const urlObj = new URL(username)
             const pathParts = urlObj.pathname.split('/').filter(p => p)
-            username = pathParts[0]
+            if (pathParts.length > 0) {
+                username = pathParts[0]
+            }
+        } catch (e) {
+            // keep as is
         }
-    } catch (e) {
-        // Not a URL, assume it's a username
     }
-    username = username.replace('@', '')
+    username = username.replace('@', '').replace('https://', '').replace('www.', '').replace('instagram.com/', '').split('/')[0]
 
-    // Check if limits reached or exists (basic check)
-    // TODO: Add limit checks
-
-    // Insert into DB
+    // Insert into DB (Simple Manual Entry)
     const { data: competitor, error: insertError } = await supabase
         .from('competitors')
         .insert({
             user_id: user.id,
-            name: username, // default to username until we get full name
+            name: username,
             username: username,
-            url: `https://www.instagram.com/${username}/`,
-            status: 'pending_scrape'
+            url: url,
+            status: 'manual', // No 'pending_scrape'
+            // Default empty stats to avoid null issues if displayed
+            followers: 0,
+            posts_count: 0,
+            profile_pic_url: null
         })
         .select()
         .single()
@@ -49,43 +57,27 @@ export async function addCompetitor(usernameOrUrl: string) {
         return { error: insertError.message }
     }
 
-    // Trigger Apify Scrape (Async)
-    // We don't await the result here to keep UI responsive, 
-    // but in a real prod env we would use webhooks.
-    // Here we'll fire and forget, relying on client-side polling or manual refresh later.
-    // OR we can make it wait if we want instant gratification (runs can take 10-30s).
-    // Let's try to wait for PROFILE first to populate the card quickly.
-
-    try {
-        const apifyClient = new ApifyClient({
-            token: process.env.APIFY_API_TOKEN,
-        })
-
-        // Start Profile Scrape (Parallel but we await it for better UX if possible, else fire-forget)
-        // Profile scraping is usually fast.
-        const profileRun = await apifyClient.actor(PROFILE_SCRAPER_ACTOR_ID).start({
-            usernames: [username]
-        })
-
-        // Start Post Scrape (Fire and forget largely, or concurrent)
-        const postRun = await apifyClient.actor(POST_SCRAPER_ACTOR_ID).start({
-            username: [username],
-            resultsLimit: 12
-        })
-
-        // Note: In a robust system, we would save profileRun.id and postRun.id to the database 
-        // to track status. For now we will rely on a separate "sync" action or webhooks.
-
-        revalidatePath('/competitors')
-        return { success: true, competitorId: competitor.id }
-
-    } catch (err) {
-        console.error('Apify Trigger Error:', err)
-        // Return success=true because we added the competitor to DB, but maybe warn about scraping
-        return { success: true, warning: 'Competitor added but scraping failed to start.', competitorId: competitor.id }
-    }
+    revalidatePath('/competencia')
+    return { success: true, competitorId: competitor.id }
 }
 
+export async function deleteCompetitor(id: string) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) return { error: 'Unauthorized' }
+
+    const { error } = await supabase
+        .from('competitors')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id)
+
+    if (error) return { error: error.message }
+
+    revalidatePath('/competencia')
+    return { success: true }
+}
 export async function syncCompetitorData(competitorId: string) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()

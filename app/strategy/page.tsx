@@ -4,7 +4,8 @@ import {
     Users, Target, Lightbulb, Layout,
     Fingerprint, MessageSquare, Box, Award,
     Plus, ChevronRight, Trash2, Link as LinkIconLucide, X,
-    PlayCircle, FileText, ChevronDown, Globe, Search
+    PlayCircle, FileText, ChevronDown, Globe, Search,
+    PanelLeftClose, PanelLeftOpen, Zap
 } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
@@ -16,7 +17,7 @@ import { ProInput } from "@/components/ui/ProInput";
 
 // --- Types ---
 type SectionId =
-    | 'avatar' | 'problem' | 'solution'
+    | 'general' | 'avatar' | 'problem' | 'solution'
     | 'character' | 'personality' | 'product' | 'positioning'
     | 'formats';
 
@@ -26,6 +27,17 @@ interface MenuItem {
     icon: any;
     description?: string;
 }
+
+const menuItems: MenuItem[] = [
+    { id: 'general', label: 'General', icon: Zap, description: 'Nicho y Propósito' },
+    { id: 'avatar', label: 'Avatar', icon: Users, description: 'Tu cliente ideal' },
+    { id: 'problem', label: 'Problema', icon: Fingerprint, description: 'Puntos de dolor' },
+    { id: 'solution', label: 'Solución', icon: Lightbulb, description: 'Tu propuesta de valor' },
+    { id: 'character', label: 'Personaje', icon: Users, description: 'Arquetipo de marca' },
+    { id: 'personality', label: 'Personalidad', icon: MessageSquare, description: 'Tono y voz' },
+    { id: 'product', label: 'Producto', icon: Box, description: 'Oferta principal' },
+    { id: 'positioning', label: 'Posicionamiento', icon: Target, description: 'Lugar en el mercado' },
+];
 
 interface Format {
     id: string;
@@ -41,13 +53,36 @@ export default function StrategyPage() {
     const supabase = createClient();
 
     // State
-    const [activeSection, setActiveSection] = useState<SectionId>('avatar');
+    const [activeSection, setActiveSection] = useState<SectionId>('general');
     const [inputs, setInputs] = useState<Record<string, string>>({});
     const [formats, setFormats] = useState<Format[]>([]);
     const [selectedFormatId, setSelectedFormatId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({ 'Video': true, 'Carrusel': true, 'Post': true });
+
+    // Sidebar State
+    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
+    // Effect to auto-collapse on Formats
+    useEffect(() => {
+        if (activeSection === 'formats') {
+            setIsSidebarOpen(false);
+        } else {
+            // Optional: Auto-open when leaving formats? Or keep user preference?
+            // reimplementing logic: if user manually closed it, keep it closed. 
+            // But for 'formats', we force close initially or just once?
+            // Let's just set it to false when entering formats.
+            // And maybe true when entering others IF it was closed by system? 
+            // For now, simpler: Just auto-collapse on Formats.
+            if (activeSection !== 'formats' && !isSidebarOpen) {
+                // Maybe don't auto-open to respect user choice, 
+                // but the requirement says "Auto-minimize on 'Formats'".
+                // It implies the opposite might be desired or just specific to Formats.
+                // Let's leave manual control for opening.
+            }
+        }
+    }, [activeSection]);
 
     // UI State
     const [showCreateFormatModal, setShowCreateFormatModal] = useState(false);
@@ -120,14 +155,18 @@ export default function StrategyPage() {
         debounce(async (id: string, updates: Partial<Format>) => {
             setSaving(true);
             try {
-                await supabase.from('formats').update({
+                const { error } = await supabase.from('formats').update({
                     ...updates,
                     updated_at: new Date().toISOString()
                 }).eq('id', id);
+
+                if (error) console.error("Error saving format:", error);
+            } catch (e) {
+                console.error("Exception saving format:", e);
             } finally {
                 setSaving(false);
             }
-        }, 1000),
+        }, 500),
         []
     );
 
@@ -170,6 +209,52 @@ export default function StrategyPage() {
 
         switch (activeSection) {
             // CORE
+            case 'general': return (
+                <div className={cn("space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500", contentPadding)}>
+                    <Header title="General" subtitle="Los cimientos de tu estrategia." />
+
+                    <ProTextarea
+                        label="Tu Nicho"
+                        placeholder="Ej: Marketing para dentistas, Fitness para mamás ocupadas..."
+                        rows={2}
+                        value={inputs['general_niche'] || ''}
+                        onChange={(e) => handleInputChange('general', 'niche', e.target.value)}
+                    />
+
+                    <div className="space-y-4">
+                        <label className="block text-xs font-bold text-zinc-900 uppercase tracking-widest pl-1">
+                            Propósito Principal
+                        </label>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {['Educar', 'Inspirar', 'Entretener'].map((type) => {
+                                const isSelected = inputs['general_content_type'] === type;
+                                return (
+                                    <button
+                                        key={type}
+                                        onClick={() => handleInputChange('general', 'content_type', type)}
+                                        className={cn(
+                                            "flex flex-col items-center justify-center p-6 rounded-2xl border transition-all duration-300 gap-3 group relative overflow-hidden",
+                                            isSelected
+                                                ? "bg-blue-50/50 border-blue-200 text-blue-700 shadow-sm ring-1 ring-blue-100"
+                                                : "bg-white border-zinc-200 text-zinc-400 hover:border-blue-100 hover:bg-blue-50/30"
+                                        )}
+                                    >
+                                        <span className={cn(
+                                            "text-lg font-bold tracking-tight transition-colors",
+                                            isSelected ? "text-blue-700" : "text-zinc-500 group-hover:text-blue-600"
+                                        )}>
+                                            {type}
+                                        </span>
+                                    </button>
+                                )
+                            })}
+                        </div>
+                        <p className="text-xs text-zinc-400 font-medium px-1">
+                            *Selecciona tu pilar principal.
+                        </p>
+                    </div>
+                </div>
+            );
             case 'avatar': return (
                 <div className={cn("space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500", contentPadding)}>
                     <Header title="¿A quién le hablas?" subtitle="Define tu avatar real, no demográfico." />
@@ -426,14 +511,16 @@ export default function StrategyPage() {
                 key={item.id}
                 onClick={() => setActiveSection(item.id)}
                 className={cn(
-                    "w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] transition-all duration-300 relative group",
+                    "w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] transition-all duration-300 relative group active:scale-95",
                     isActive
                         ? "text-[#2563EB] bg-blue-50/40 font-bold"
-                        : "text-zinc-500 hover:text-zinc-900 hover:bg-white hover:shadow-sm"
+                        : "text-zinc-500 hover:text-zinc-900 hover:bg-white hover:shadow-sm",
+                    !isSidebarOpen && "justify-center px-2"
                 )}
+                title={!isSidebarOpen ? item.label : undefined}
             >
                 {isActive && (
-                    <div className="absolute left-0 w-1 h-4 bg-[#2563EB] rounded-r-full" />
+                    <div className={cn("absolute left-0 w-1 h-4 bg-[#2563EB] rounded-r-full", !isSidebarOpen && "left-0.5")} />
                 )}
 
                 <item.icon
@@ -443,7 +530,7 @@ export default function StrategyPage() {
                     )}
                     strokeWidth={2.5}
                 />
-                <span className="truncate">{item.label}</span>
+                {isSidebarOpen && <span className="truncate animate-in fade-in duration-200">{item.label}</span>}
             </button>
         );
     };
@@ -452,106 +539,246 @@ export default function StrategyPage() {
         <div className="flex flex-row h-screen w-full bg-[var(--color-background)]">
 
             {/* Strategy Sub-Sidebar (Fixed Width, Styled like Main Sidebar) */}
-            <div className="w-64 flex flex-col shrink-0 border-r border-zinc-200/60 bg-[#FBFBFB]">
-                <div className="flex-1 overflow-y-auto px-3 py-6 space-y-8 custom-scrollbar">
-
-                    {/* CORE SECTION */}
-                    <div className="space-y-1 animate-in slide-in-from-left-4 duration-500 delay-100">
-                        <div className="px-3 pb-1 pt-2">
-                            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-[0.15em] flex items-center gap-2">
-                                <Box className="w-3 h-3" /> Core
-                            </span>
-                        </div>
-                        {[
-                            { id: 'avatar', label: 'Avatar', icon: Users },
-                            { id: 'problem', label: 'Problema', icon: Fingerprint },
-                            { id: 'solution', label: 'Solución', icon: Lightbulb }
-                        ].map((item: any) => renderSidebarItem(item))}
-                    </div>
-
-                    {/* IDENTITY SECTION */}
-                    <div className="space-y-1 animate-in slide-in-from-left-4 duration-500 delay-200">
-                        <div className="px-3 pb-1 pt-2">
-                            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-[0.15em] flex items-center gap-2">
-                                <Award className="w-3 h-3" /> Identidad
-                            </span>
-                        </div>
-                        {[
-                            { id: 'character', label: 'Personaje', icon: Users },
-                            { id: 'personality', label: 'Personalidad', icon: MessageSquare },
-                            { id: 'product', label: 'Producto', icon: Box },
-                            { id: 'positioning', label: 'Posicionamiento', icon: Target }
-                        ].map((item: any) => renderSidebarItem(item))}
-                    </div>
-
-                    {/* LIBRARY SECTION */}
-                    <div className="space-y-1 animate-in slide-in-from-left-4 duration-500 delay-300">
-                        <div className="px-3 pb-1 pt-2">
-                            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-[0.15em] flex items-center gap-2">
-                                <Layout className="w-3 h-3" /> Biblioteca
-                            </span>
-                        </div>
-                        {renderSidebarItem({ id: 'formats', label: 'Formatos', icon: Layout })}
-                    </div>
-
+            {/* Sidebar Redesign - Bento Style / Full Height */}
+            <div className={cn(
+                "flex flex-col shrink-0 bg-white border-r border-zinc-200 h-full transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] overflow-hidden relative",
+                isSidebarOpen ? "w-80" : "w-[72px]"
+            )}>
+                {/* Toggle Button */}
+                <div className="absolute top-4 right-4 z-20">
+                    <button
+                        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                        className="p-1.5 text-zinc-400 hover:text-zinc-900 bg-white/50 hover:bg-white rounded-full transition-all"
+                    >
+                        {isSidebarOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
+                    </button>
                 </div>
-            </div>
 
-            {/* Main Content Area */}
-            {activeSection === 'formats' ? (
-                // Formats has its own "sub-sidebar + content" layout inside renderContent
-                <div className="flex-1 min-w-0 bg-white/40">
-                    {renderContent()}
-                </div>
-            ) : (
-                // Standard Strategy Info Content
-                <div className="flex-1 min-w-0 bg-white/40 flex flex-col">
-                    <div className="flex-1 h-full overflow-y-auto custom-scrollbar">
-                        {renderContent()}
+                {/* CONTENT CONTAINER */}
+                <div className="flex flex-col h-full p-4 overflow-y-auto custom-scrollbar">
+
+                    {/* HEADER */}
+                    <div className={cn("shrink-0 px-2 py-2 mb-6 transition-all flex items-center justify-between", !isSidebarOpen && "justify-center")}>
+                        {isSidebarOpen ? (
+                            <h2 className="text-sm font-bold text-zinc-900 uppercase tracking-wider">Estrategia</h2>
+                        ) : (
+                            <div className="w-1 h-4 bg-zinc-200 rounded-full" />
+                        )}
                     </div>
-                </div>
-            )}
 
-            {/* Create Format Modal */}
-            {showCreateFormatModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/40 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-300">
-                        <div className="p-8 pb-6 text-center">
-                            <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                                <Plus className="w-8 h-8 text-blue-600" />
-                            </div>
-                            <h3 className="text-2xl font-black text-zinc-900 mb-2">Nuevo Formato</h3>
-                            <p className="text-sm text-zinc-500 font-medium">¿Qué tipo de contenido vas a estructurar hoy?</p>
-                        </div>
-                        <div className="p-6 pt-0 space-y-3">
-                            {[
-                                { id: 'Video', icon: PlayCircle, desc: 'Estructura para Reels, TikToks...' },
-                                { id: 'Carrusel', icon: Layout, desc: 'Secuencia de imágenes deslizables.' },
-                                { id: 'Post', icon: FileText, desc: 'Imagen estática o texto simple.' }
-                            ].map((opt: any) => (
+                    {/* GROUP 0: GENERAL */}
+                    <div className="mb-2">
+                        <div className="flex flex-col gap-1">
+                            {menuItems.slice(0, 1).map((item) => (
                                 <button
-                                    key={opt.id}
-                                    onClick={() => handleCreateFormat(opt.id)}
-                                    className="w-full flex items-center gap-4 p-4 rounded-xl border border-zinc-100 hover:border-blue-200 hover:bg-blue-50/50 hover:shadow-md transition-all group text-left"
+                                    key={item.id}
+                                    onClick={() => setActiveSection(item.id)}
+                                    className={cn(
+                                        "group relative flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 w-full",
+                                        activeSection === item.id
+                                            ? "bg-blue-50/50 text-blue-600 font-medium"
+                                            : "text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50"
+                                    )}
+                                    title={!isSidebarOpen ? item.label : undefined}
                                 >
-                                    <div className="w-10 h-10 rounded-full bg-white border border-zinc-100 flex items-center justify-center group-hover:scale-110 transition-transform shadow-sm">
-                                        <opt.icon className="w-5 h-5 text-zinc-400 group-hover:text-blue-600 transition-colors" />
+                                    <div className={cn("shrink-0 flex items-center justify-center", !isSidebarOpen && "w-full")}>
+                                        <item.icon className={cn(
+                                            "w-4 h-4 transition-colors",
+                                            activeSection === item.id ? "text-blue-600" : "text-zinc-400 group-hover:text-zinc-600"
+                                        )} />
                                     </div>
-                                    <div>
-                                        <span className="block text-sm font-bold text-zinc-900 group-hover:text-blue-700 transition-colors">{opt.id}</span>
-                                        <span className="block text-xs text-zinc-400">{opt.desc}</span>
-                                    </div>
-                                    <ChevronRight className="w-4 h-4 ml-auto text-zinc-200 group-hover:text-blue-400" />
+
+                                    {isSidebarOpen && (
+                                        <span className="text-sm truncate">{item.label}</span>
+                                    )}
+
+                                    {activeSection === item.id && (
+                                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-blue-600 rounded-r-full" />
+                                    )}
                                 </button>
                             ))}
                         </div>
-                        <div className="p-4 bg-zinc-50 border-t border-zinc-100 text-center">
-                            <button onClick={() => setShowCreateFormatModal(false)} className="text-xs font-bold text-zinc-400 hover:text-zinc-600">Cancelar</button>
+                    </div>
+
+                    <div className="h-px bg-zinc-100 mx-4 mb-6" />
+
+                    {/* GROUP 1: CORE */}
+                    <div className="mb-8">
+                        {isSidebarOpen && (
+                            <h3 className="px-3 text-[10px] uppercase font-bold text-zinc-400 tracking-[0.2em] mb-3 flex items-center gap-2">
+                                <Box className="w-3 h-3" /> Core
+                            </h3>
+                        )}
+                        <div className="flex flex-col gap-1">
+                            {menuItems.slice(1, 4).map((item) => (
+                                <button
+                                    key={item.id}
+                                    onClick={() => setActiveSection(item.id)}
+                                    className={cn(
+                                        "group relative flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 w-full",
+                                        activeSection === item.id
+                                            ? "bg-blue-50/50 text-blue-600 font-medium"
+                                            : "text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50"
+                                    )}
+                                    title={!isSidebarOpen ? item.label : undefined}
+                                >
+                                    <div className={cn("shrink-0 flex items-center justify-center", !isSidebarOpen && "w-full")}>
+                                        <item.icon className={cn(
+                                            "w-4 h-4 transition-colors",
+                                            activeSection === item.id ? "text-blue-600" : "text-zinc-400 group-hover:text-zinc-600"
+                                        )} />
+                                    </div>
+
+                                    {isSidebarOpen && (
+                                        <span className="text-sm truncate">{item.label}</span>
+                                    )}
+
+                                    {activeSection === item.id && (
+                                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-blue-600 rounded-r-full" />
+                                    )}
+                                </button>
+                            ))}
                         </div>
                     </div>
+
+                    {/* GROUP 2: IDENTIDAD */}
+                    <div className="mb-8">
+                        {isSidebarOpen && (
+                            <h3 className="px-3 text-[10px] uppercase font-bold text-zinc-400 tracking-[0.2em] mb-3 flex items-center gap-2">
+                                <Fingerprint className="w-3 h-3" /> Identidad
+                            </h3>
+                        )}
+                        <div className="flex flex-col gap-1">
+                            {menuItems.slice(4, 8).map((item) => (
+                                <button
+                                    key={item.id}
+                                    onClick={() => setActiveSection(item.id)}
+                                    className={cn(
+                                        "group relative flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 w-full",
+                                        activeSection === item.id
+                                            ? "bg-blue-50/50 text-blue-600 font-medium"
+                                            : "text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50"
+                                    )}
+                                    title={!isSidebarOpen ? item.label : undefined}
+                                >
+                                    <div className={cn("shrink-0 flex items-center justify-center", !isSidebarOpen && "w-full")}>
+                                        <item.icon className={cn(
+                                            "w-4 h-4 transition-colors",
+                                            activeSection === item.id ? "text-blue-600" : "text-zinc-400 group-hover:text-zinc-600"
+                                        )} />
+                                    </div>
+
+                                    {isSidebarOpen && (
+                                        <span className="text-sm truncate">{item.label}</span>
+                                    )}
+
+                                    {activeSection === item.id && (
+                                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-blue-600 rounded-r-full" />
+                                    )}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* GROUP 3: BIBLIOTECA */}
+                    <div>
+                        {isSidebarOpen && (
+                            <h3 className="px-3 text-[10px] uppercase font-bold text-zinc-400 tracking-[0.2em] mb-3 flex items-center gap-2">
+                                <Layout className="w-3 h-3" /> Biblioteca
+                            </h3>
+                        )}
+                        <div className="flex flex-col gap-1">
+                            <button
+                                onClick={() => setActiveSection('formats')}
+                                className={cn(
+                                    "group relative flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 w-full",
+                                    activeSection === 'formats'
+                                        ? "bg-blue-50/50 text-blue-600 font-medium"
+                                        : "text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50"
+                                )}
+                                title={!isSidebarOpen ? "Formatos" : undefined}
+                            >
+                                <div className={cn("shrink-0 flex items-center justify-center", !isSidebarOpen && "w-full")}>
+                                    <Layout className={cn(
+                                        "w-4 h-4 transition-colors",
+                                        activeSection === 'formats' ? "text-blue-600" : "text-zinc-400 group-hover:text-zinc-600"
+                                    )} />
+                                </div>
+
+                                {isSidebarOpen && (
+                                    <span className="text-sm truncate">Formatos</span>
+                                )}
+
+                                {activeSection === 'formats' && (
+                                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-blue-600 rounded-r-full" />
+                                )}
+                            </button>
+                        </div>
+                    </div>
+
                 </div>
-            )}
-        </div>
+            </div >
+
+
+            {/* Main Content Area */}
+            {
+                activeSection === 'formats' ? (
+                    // Formats has its own "sub-sidebar + content" layout inside renderContent
+                    <div className="flex-1 min-w-0 bg-white/40">
+                        {renderContent()}
+                    </div>
+                ) : (
+                    // Standard Strategy Info Content
+                    <div className="flex-1 min-w-0 bg-white/40 flex flex-col">
+                        <div className="flex-1 h-full overflow-y-auto custom-scrollbar">
+                            {renderContent()}
+                        </div>
+                    </div>
+                )
+            }
+
+            {/* Create Format Modal */}
+            {
+                showCreateFormatModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/40 backdrop-blur-sm animate-in fade-in duration-200">
+                        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-300">
+                            <div className="p-8 pb-6 text-center">
+                                <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                                    <Plus className="w-8 h-8 text-blue-600" />
+                                </div>
+                                <h3 className="text-2xl font-black text-zinc-900 mb-2">Nuevo Formato</h3>
+                                <p className="text-sm text-zinc-500 font-medium">¿Qué tipo de contenido vas a estructurar hoy?</p>
+                            </div>
+                            <div className="p-6 pt-0 space-y-3">
+                                {[
+                                    { id: 'Video', icon: PlayCircle, desc: 'Estructura para Reels, TikToks...' },
+                                    { id: 'Carrusel', icon: Layout, desc: 'Secuencia de imágenes deslizables.' },
+                                    { id: 'Post', icon: FileText, desc: 'Imagen estática o texto simple.' }
+                                ].map((opt: any) => (
+                                    <button
+                                        key={opt.id}
+                                        onClick={() => handleCreateFormat(opt.id)}
+                                        className="w-full flex items-center gap-4 p-4 rounded-xl border border-zinc-100 hover:border-blue-200 hover:bg-blue-50/50 hover:shadow-md transition-all group text-left"
+                                    >
+                                        <div className="w-10 h-10 rounded-full bg-white border border-zinc-100 flex items-center justify-center group-hover:scale-110 transition-transform shadow-sm">
+                                            <opt.icon className="w-5 h-5 text-zinc-400 group-hover:text-blue-600 transition-colors" />
+                                        </div>
+                                        <div>
+                                            <span className="block text-sm font-bold text-zinc-900 group-hover:text-blue-700 transition-colors">{opt.id}</span>
+                                            <span className="block text-xs text-zinc-400">{opt.desc}</span>
+                                        </div>
+                                        <ChevronRight className="w-4 h-4 ml-auto text-zinc-200 group-hover:text-blue-400" />
+                                    </button>
+                                ))}
+                            </div>
+                            <div className="p-4 bg-zinc-50 border-t border-zinc-100 text-center">
+                                <button onClick={() => setShowCreateFormatModal(false)} className="text-xs font-bold text-zinc-400 hover:text-zinc-600">Cancelar</button>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+        </div >
     );
 }
 

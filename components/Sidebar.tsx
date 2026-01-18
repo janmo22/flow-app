@@ -26,12 +26,13 @@ const creatorNav = [
     { icon: FileText, label: "Estrategia", href: "/strategy" },
     { icon: PenTool, label: "Guiones", href: "/scripts" },
     { icon: CalendarIcon, label: "Calendario", href: "/calendar" },
-    { icon: BarChart2, label: "Análisis", href: "/analytics" },
+    // { icon: BarChart2, label: "Análisis", href: "/analytics" },
 ];
 
 const researchNav = [
     { icon: Users, label: "Competencia", href: "/competencia" },
-    { icon: Sparkles, label: "Inspiración", href: "/inspiration" },
+    // { icon: Sparkles, label: "Inspiración", href: "/inspiration" },
+    // ...(process.env.NODE_ENV === 'development' ? [{ icon: BarChart2, label: "Análisis", href: "/analytics" }] : []),
 ];
 
 const configNav: { icon: any; label: string; href: string }[] = [];
@@ -66,13 +67,7 @@ export function Sidebar() {
             {/* Main Content */}
             <div className="flex-1 overflow-y-auto px-3 space-y-6">
 
-                <div className="px-1 mb-2">
-                    <button className="w-full flex items-center gap-2 px-3 py-2 bg-white border border-zinc-200 shadow-[0_1px_2px_rgba(0,0,0,0.02)] rounded-lg text-zinc-400 text-[11px] hover:border-zinc-300 transition-all font-medium">
-                        <Search className="w-3.5 h-3.5" />
-                        <span>Buscar en Flow...</span>
-                        <kbd className="ml-auto font-sans text-[9px] bg-zinc-50 border border-zinc-200 rounded px-1.5 py-0.5 text-zinc-400">⌘K</kbd>
-                    </button>
-                </div>
+                {/* Search removed as requested */}
 
                 <div className="space-y-1">
                     {mainNav.map(item => (
@@ -133,7 +128,7 @@ function NavItem({ item, pathname }: any) {
         <Link
             href={item.href}
             className={cn(
-                "group flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] transition-all duration-300 relative",
+                "group flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] transition-all duration-300 relative active:scale-95",
                 isActive
                     ? "text-[#2563EB] bg-blue-50/40 font-bold"
                     : "text-zinc-500 hover:text-zinc-900 hover:bg-white hover:shadow-sm"

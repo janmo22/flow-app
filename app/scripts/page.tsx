@@ -3,11 +3,11 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import {
     Plus, FileText, Trash2,
-    Bold, Italic, Underline, Highlighter,
+    Bold, Italic, Underline,
     List, ListOrdered, Quote, Image as ImageIcon, X,
-    Layers, Lightbulb, PenTool, Calendar as CalendarIcon,
-    ChevronLeft, ChevronRight, Check, Clock, Globe, Layout,
-    Loader2, ExternalLink
+    Layers, Lightbulb, Calendar as CalendarIcon,
+    ChevronLeft, ChevronRight, Check, Video, Globe, Layout,
+    Loader2, ExternalLink, ChevronDown, PlayCircle, Target, MessageSquare
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/PageHeader";
@@ -39,6 +39,13 @@ interface Script {
     strategy_format?: string;
 }
 
+interface Format {
+    id: string;
+    title: string;
+    tag: string;
+    structure: string;
+}
+
 interface Inspiration {
     id: string;
     title: string;
@@ -52,9 +59,14 @@ interface Inspiration {
 export default function ScriptsPage() {
     const { session } = useAuth();
     const supabase = createClient();
+
+    // Data State
     const [activeScript, setActiveScript] = useState<Script | null>(null);
     const [scripts, setScripts] = useState<Script[]>([]);
+    const [formats, setFormats] = useState<Format[]>([]);
     const [inspirationItems, setInspirationItems] = useState<Inspiration[]>([]);
+
+    // UI State
     const [loading, setLoading] = useState(true);
     const [loadingInspo, setLoadingInspo] = useState(false);
     const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error'>('saved');
@@ -62,23 +74,23 @@ export default function ScriptsPage() {
     const [viewMode, setViewMode] = useState<'content' | 'strategy'>('content');
     const [isCreating, setIsCreating] = useState(false);
     const [showScheduleModal, setShowScheduleModal] = useState(false);
+    const [showFormatSelector, setShowFormatSelector] = useState(false);
+    const [calendarMonth, setCalendarMonth] = useState(new Date());
 
-    // Fetch scripts on mount
+    // Fetch Initial Data
     useEffect(() => {
         if (session?.user?.id) {
             fetchScripts();
+            fetchFormats();
             fetchInspiration();
         }
     }, [session]);
 
     const fetchScripts = async () => {
         setLoading(true);
-        const { data, error } = await supabase
+        const { data } = await supabase
             .from('scripts')
-            .select(`
-                *,
-                slides (*)
-            `)
+            .select(`*, slides (*)`)
             .eq('user_id', session?.user?.id)
             .is('deleted_at', null)
             .order('updated_at', { ascending: false });
@@ -94,6 +106,16 @@ export default function ScriptsPage() {
             }
         }
         setLoading(false);
+    };
+
+    const fetchFormats = async () => {
+        const { data } = await supabase
+            .from('formats')
+            .select('id, title, tag, structure')
+            .eq('user_id', session?.user?.id)
+            .is('deleted_at', null)
+            .order('title', { ascending: true });
+        if (data) setFormats(data);
     };
 
     const fetchInspiration = async () => {
@@ -130,20 +152,16 @@ export default function ScriptsPage() {
 
             if (script.type === 'carousel') {
                 for (const slide of script.slides) {
-                    await supabase
-                        .from('slides')
-                        .upsert({
-                            id: slide.id,
-                            script_id: script.id,
-                            content: slide.content,
-                            position: slide.position
-                        });
+                    await supabase.from('slides').upsert({
+                        id: slide.id,
+                        script_id: script.id,
+                        content: slide.content,
+                        position: slide.position
+                    });
                 }
             }
-
-            if (error) setSaveStatus('error');
-            else setSaveStatus('saved');
-        }, 2000),
+            setSaveStatus(error ? 'error' : 'saved');
+        }, 1500),
         [session]
     );
 
@@ -151,14 +169,14 @@ export default function ScriptsPage() {
         if (!activeScript) return;
         const updated = { ...activeScript, ...updates };
         setActiveScript(updated);
-        setScripts(scripts.map(s => s.id === updated.id ? updated : s));
+        setScripts(prev => prev.map(s => s.id === updated.id ? updated : s));
         debouncedSave(updated);
     };
 
+    // Actions
     const handleCreateNew = async (type: ScriptType) => {
         if (!session?.user?.id) return;
-
-        const { data: newScriptData, error } = await supabase
+        const { data: newScriptData } = await supabase
             .from('scripts')
             .insert({
                 user_id: session.user.id,
@@ -176,18 +194,13 @@ export default function ScriptsPage() {
         if (newScriptData) {
             let slides: Slide[] = [];
             if (type === 'carousel') {
-                const { data: slideData } = await supabase
-                    .from('slides')
-                    .insert({
-                        script_id: newScriptData.id,
-                        content: "Slide 1",
-                        position: 0
-                    })
-                    .select()
-                    .single();
+                const { data: slideData } = await supabase.from('slides').insert({
+                    script_id: newScriptData.id,
+                    content: "Slide 1",
+                    position: 0
+                }).select().single();
                 if (slideData) slides = [slideData];
             }
-
             const fullScript = { ...newScriptData, slides };
             setScripts([fullScript, ...scripts]);
             setActiveScript(fullScript);
@@ -197,28 +210,42 @@ export default function ScriptsPage() {
     };
 
     const handleDelete = async (id: string) => {
-        const { error } = await supabase
-            .from('scripts')
-            .update({ deleted_at: new Date().toISOString() })
-            .eq('id', id);
-
-        if (!error) {
-            const remaining = scripts.filter(s => s.id !== id);
-            setScripts(remaining);
-            if (activeScript?.id === id) {
-                setActiveScript(remaining.length > 0 ? remaining[0] : null);
-            }
-        }
+        await supabase.from('scripts').update({ deleted_at: new Date().toISOString() }).eq('id', id);
+        const remaining = scripts.filter(s => s.id !== id);
+        setScripts(remaining);
+        if (activeScript?.id === id) setActiveScript(remaining[0] || null);
     };
 
+    const handleApplyFormat = (format: Format) => {
+        updateActiveScript({
+            strategy_format: format.id,
+            // Optionally autofill structure if user wants? For now just linking data
+        });
+        setShowFormatSelector(false);
+    };
+
+    // Editor Commands
     const execCmd = (command: string, value: string | undefined = undefined) => {
-        document.execCommand('styleWithCSS', false, 'false');
+        // Prevent default focus loss is handled in onMouseDown of buttons
         document.execCommand(command, false, value);
+    };
+
+    // Calendar Helpers
+    const getDaysInMonth = (date: Date) => {
+        const year = date.getFullYear();
+        const month = date.getMonth();
+        const firstDay = new Date(year, month, 1).getDay();
+        const days = new Date(year, month + 1, 0).getDate();
+        const res = [];
+        for (let i = 0; i < (firstDay === 0 ? 6 : firstDay - 1); i++) res.push(null);
+        for (let i = 1; i <= days; i++) res.push(new Date(year, month, i));
+        return res;
     };
 
     return (
         <div className="max-w-[1600px] mx-auto h-[calc(100vh-2rem)] flex flex-col pt-8 pb-6 px-6 font-sans text-zinc-900 relative">
 
+            {/* Header */}
             <div className="mb-6 flex items-end justify-between">
                 <PageHeader
                     title="Studio"
@@ -227,18 +254,17 @@ export default function ScriptsPage() {
                         { label: activeScript?.type === 'video' ? 'Editor de Vídeo' : activeScript?.type === 'carousel' ? 'Editor de Carrusel' : 'Editor' }
                     ]}
                 />
-
                 <button
                     onClick={() => setShowScheduleModal(true)}
-                    className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-blue-700 hover:shadow-lg hover:shadow-blue-500/20 transition-all group mb-1"
+                    className="flex items-center gap-2 bg-zinc-900 text-white px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-black hover:shadow-lg hover:scale-105 active:scale-95 transition-all group mb-1"
                 >
-                    <Plus className="w-4 h-4 text-blue-100 group-hover:text-white transition-colors" />
-                    <span>Calendarizar</span>
+                    <CalendarIcon className="w-4 h-4 text-zinc-300 group-hover:text-white transition-colors" />
+                    <span>{activeScript?.scheduled_date ? new Date(activeScript.scheduled_date).toLocaleDateString() : 'Agendar'}</span>
                 </button>
             </div>
 
             <div className="flex flex-1 gap-8 animate-in fade-in duration-500 overflow-hidden">
-                {/* --- Sidebar --- */}
+                {/* --- Sidebar Projects --- */}
                 <div className="w-72 flex flex-col h-full shrink-0 pr-6 border-r border-zinc-200/50 mr-2">
                     <div className="flex items-center justify-between mb-6 pl-2 pr-1">
                         <div className="flex items-center gap-2">
@@ -248,24 +274,24 @@ export default function ScriptsPage() {
                         <div className="relative">
                             <button
                                 onClick={() => setIsCreating(!isCreating)}
-                                className="p-2 rounded-lg hover:bg-zinc-100 text-zinc-500 hover:text-zinc-900 transition-all"
+                                className="p-2 rounded-lg hover:bg-zinc-100 text-zinc-500 hover:text-zinc-900 transition-all active:scale-95"
                             >
                                 <Plus className="w-4 h-4" />
                             </button>
                             {isCreating && (
-                                <div className="absolute top-10 right-0 w-40 bg-white border border-zinc-100 shadow-xl rounded-xl overflow-hidden z-50 p-1">
-                                    <button onClick={() => handleCreateNew('video')} className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-600 hover:bg-zinc-50 rounded-lg flex items-center gap-2">
-                                        <FileText className="w-3 h-3" /> Vídeo
+                                <div className="absolute top-8 right-0 w-48 bg-white border border-zinc-100 shadow-xl rounded-xl overflow-hidden z-50 p-1 animate-in zoom-in-95 duration-200">
+                                    <button onClick={() => handleCreateNew('video')} className="w-full text-left px-3 py-2.5 text-xs font-bold text-zinc-600 hover:bg-zinc-50 rounded-lg flex items-center gap-3">
+                                        <PlayCircle className="w-4 h-4 text-purple-500" /> Vídeo
                                     </button>
-                                    <button onClick={() => handleCreateNew('carousel')} className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-600 hover:bg-zinc-50 rounded-lg flex items-center gap-2">
-                                        <Layers className="w-3 h-3" /> Carrusel
+                                    <button onClick={() => handleCreateNew('carousel')} className="w-full text-left px-3 py-2.5 text-xs font-bold text-zinc-600 hover:bg-zinc-50 rounded-lg flex items-center gap-3">
+                                        <Layers className="w-4 h-4 text-blue-500" /> Carrusel
                                     </button>
                                 </div>
                             )}
                         </div>
                     </div>
 
-                    <div className="overflow-y-auto space-y-2 pr-2 flex-1">
+                    <div className="overflow-y-auto space-y-2 pr-2 flex-1 custom-scrollbar">
                         {loading ? (
                             <div className="flex justify-center py-10"><Loader2 className="w-5 h-5 animate-spin text-zinc-300" /></div>
                         ) : scripts.length === 0 ? (
@@ -276,98 +302,159 @@ export default function ScriptsPage() {
                                     key={script.id}
                                     onClick={() => setActiveScript(script)}
                                     className={cn(
-                                        "p-3 rounded-xl cursor-pointer transition-all border group relative flex items-start gap-3",
-                                        activeScript?.id === script.id ? "bg-white border-zinc-200 shadow-sm" : "bg-transparent border-transparent hover:bg-zinc-100/60"
+                                        "p-3 rounded-xl cursor-pointer transition-all border group relative flex items-start gap-3 select-none active:scale-[0.98]",
+                                        activeScript?.id === script.id ? "bg-white border-zinc-200 shadow-sm" : "bg-transparent border-transparent hover:bg-zinc-50"
                                     )}
                                 >
                                     <div className={cn(
-                                        "w-9 h-9 rounded-lg flex items-center justify-center shrink-0 border",
-                                        activeScript?.id === script.id ? "bg-zinc-900 text-white" : "bg-white text-zinc-400"
+                                        "w-9 h-9 rounded-lg flex items-center justify-center shrink-0 border transition-colors",
+                                        activeScript?.id === script.id ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-400 border-zinc-100"
                                     )}>
-                                        {script.type === 'carousel' ? <Layers className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
+                                        {script.type === 'carousel' ? <Layers className="w-4 h-4" /> : <PlayCircle className="w-4 h-4" />}
                                     </div>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-xs font-semibold truncate text-zinc-900">{script.title}</p>
-                                        <span className="text-[10px] text-zinc-400 capitalize">{script.status}</span>
+                                    <div className="flex-1 min-w-0 pt-0.5">
+                                        <p className="text-xs font-bold truncate text-zinc-900">{script.title}</p>
+                                        <span className="text-[9px] text-zinc-400 font-medium capitalize">{script.status}</span>
+                                        {script.scheduled_date && <span className="ml-2 text-[9px] text-blue-500 font-bold bg-blue-50 px-1.5 py-0.5 rounded-full">{new Date(script.scheduled_date).getDate()}/{new Date(script.scheduled_date).getMonth() + 1}</span>}
                                     </div>
-                                    <button onClick={(e) => { e.stopPropagation(); handleDelete(script.id); }} className="opacity-0 group-hover:opacity-100 p-1 text-zinc-300 hover:text-red-500 transition-all"><Trash2 className="w-3 h-3" /></button>
+                                    <button onClick={(e) => { e.stopPropagation(); handleDelete(script.id); }} className="opacity-0 group-hover:opacity-100 p-1.5 text-zinc-300 hover:text-red-500 transition-all hover:bg-red-50 rounded-md absolute right-2 top-2"><Trash2 className="w-3.5 h-3.5" /></button>
                                 </div>
                             ))
                         )}
                     </div>
                 </div>
 
-                {/* --- Editor Area --- */}
+                {/* --- Main Editor Area --- */}
                 <div className="flex-1 bg-white border border-zinc-100 rounded-[24px] shadow-sm flex flex-col overflow-hidden relative">
                     {!activeScript ? (
-                        <div className="flex-1 flex flex-col items-center justify-center gap-4 text-zinc-300">
-                            <FileText className="w-12 h-12 opacity-20" />
-                            <p className="text-sm font-bold uppercase tracking-widest">Selecciona o crea un proyecto</p>
+                        <div className="flex-1 flex flex-col items-center justify-center gap-6 text-zinc-300">
+                            <div className="w-20 h-20 rounded-full bg-zinc-50 flex items-center justify-center">
+                                <FileText className="w-8 h-8 opacity-50" />
+                            </div>
+                            <p className="text-xs font-bold uppercase tracking-widest text-zinc-400">Selecciona o crea un proyecto</p>
                         </div>
                     ) : (
                         <>
-                            <div className="h-16 flex items-center justify-between px-8 pt-4 pb-2 shrink-0">
-                                <input
-                                    className="text-2xl font-bold text-zinc-900 border-none focus:ring-0 p-0 bg-transparent w-full"
-                                    value={activeScript.title}
-                                    onChange={(e) => updateActiveScript({ title: e.target.value })}
-                                />
-                                <div className="flex items-center gap-4 ml-4">
-                                    <div className="bg-zinc-100 p-1 rounded-full flex">
-                                        <button onClick={() => setViewMode('content')} className={cn("px-4 py-1.5 rounded-full text-xs font-bold transition-all", viewMode === 'content' ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500")}>Editor</button>
-                                        <button onClick={() => setViewMode('strategy')} className={cn("px-4 py-1.5 rounded-full text-xs font-bold transition-all", viewMode === 'strategy' ? "bg-white text-blue-600 shadow-sm" : "text-zinc-500")}>Estrategia</button>
+                            {/* Editor Top Bar */}
+                            <div className="h-18 flex items-center justify-between px-8 py-5 shrink-0 bg-white border-b border-zinc-50">
+                                <div className="flex items-center gap-4 flex-1 mr-8">
+                                    <input
+                                        className="text-2xl font-black text-zinc-900 border-none focus:ring-0 p-0 bg-transparent w-full tracking-tight placeholder:text-zinc-200"
+                                        value={activeScript.title}
+                                        onChange={(e) => updateActiveScript({ title: e.target.value })}
+                                        placeholder="Título del Guion"
+                                    />
+
+                                    {/* Format Select Dropdown */}
+                                    <div className="relative shrink-0">
+                                        <button
+                                            onClick={() => setShowFormatSelector(!showFormatSelector)}
+                                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-50 border border-zinc-200 text-[10px] font-bold uppercase tracking-wider text-zinc-500 hover:border-blue-200 hover:text-blue-600 transition-all"
+                                        >
+                                            {formats.find(f => f.id === activeScript.strategy_format)?.title || "Formato: Ninguno"}
+                                            <ChevronDown className="w-3 h-3" />
+                                        </button>
+
+                                        {showFormatSelector && (
+                                            <div className="absolute top-full left-0 mt-2 w-64 bg-white border border-zinc-100 shadow-xl rounded-xl overflow-hidden z-20 animate-in zoom-in-95 duration-200">
+                                                <div className="max-h-60 overflow-y-auto custom-scrollbar p-1">
+                                                    <button
+                                                        onClick={() => { updateActiveScript({ strategy_format: undefined }); setShowFormatSelector(false); }}
+                                                        className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-50 rounded-lg mb-1"
+                                                    >
+                                                        Ninguno
+                                                    </button>
+                                                    {formats
+                                                        .filter(f => {
+                                                            if (!activeScript.type) return true;
+                                                            if (activeScript.type === 'video') return f.tag === 'Video';
+                                                            if (activeScript.type === 'carousel') return f.tag === 'Carrusel';
+                                                            return true;
+                                                        })
+                                                        .map(format => (
+                                                            <button
+                                                                key={format.id}
+                                                                onClick={() => handleApplyFormat(format)}
+                                                                className="w-full text-left px-3 py-2 text-xs font-bold text-zinc-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg flex items-center gap-2 mb-0.5"
+                                                            >
+                                                                <Layout className="w-3 h-3 opacity-50" />
+                                                                {format.title}
+                                                            </button>
+                                                        ))}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
-                                    <button onClick={() => setShowGlobalReferences(!showGlobalReferences)} className={cn("p-2 rounded-xl transition-all", showGlobalReferences ? "bg-blue-50 text-blue-600" : "text-zinc-400 hover:bg-zinc-50")}>
-                                        <ImageIcon className="w-5 h-5" />
+                                </div>
+
+                                <div className="flex items-center gap-4">
+                                    <div className="bg-zinc-100 p-1 rounded-xl flex">
+                                        <button onClick={() => setViewMode('content')} className={cn("px-4 py-1.5 rounded-lg text-xs font-bold transition-all", viewMode === 'content' ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-700")}>Editor</button>
+                                        <button onClick={() => setViewMode('strategy')} className={cn("px-4 py-1.5 rounded-lg text-xs font-bold transition-all", viewMode === 'strategy' ? "bg-white text-blue-600 shadow-sm" : "text-zinc-500 hover:text-zinc-700")}>Estrategia</button>
+                                    </div>
+                                    <button
+                                        onClick={() => setShowGlobalReferences(!showGlobalReferences)}
+                                        className={cn(
+                                            "p-2 rounded-xl transition-all border",
+                                            showGlobalReferences ? "bg-blue-50 text-blue-600 border-blue-100" : "bg-white text-zinc-400 border-zinc-200 hover:border-zinc-300"
+                                        )}
+                                        title="Abrir Referencias"
+                                    >
+                                        <ImageIcon className="w-4 h-4" />
                                     </button>
                                 </div>
                             </div>
 
+                            {/* Content View */}
                             {viewMode === 'content' ? (
-                                <div className="flex flex-col flex-1 overflow-hidden">
-                                    <div className="px-8 py-3 flex items-center gap-1 border-b border-zinc-50 bg-white/50 backdrop-blur-sm sticky top-0 z-10">
-                                        <ToolbarBtn icon={Bold} onClick={() => execCmd('bold')} />
-                                        <ToolbarBtn icon={Italic} onClick={() => execCmd('italic')} />
-                                        <ToolbarBtn icon={Underline} onClick={() => execCmd('underline')} />
+                                <div className="flex flex-col flex-1 overflow-hidden relative">
+                                    <div className="px-8 py-3 flex items-center gap-1 border-b border-zinc-50 bg-white/80 backdrop-blur-md sticky top-0 z-10 transition-all">
+                                        <ToolbarBtn icon={Bold} onClick={() => execCmd('bold')} tooltip="Negrita" />
+                                        <ToolbarBtn icon={Italic} onClick={() => execCmd('italic')} tooltip="Cursiva" />
+                                        <ToolbarBtn icon={Underline} onClick={() => execCmd('underline')} tooltip="Subrayado" />
                                         <div className="w-[1px] h-4 bg-zinc-200 mx-2" />
-                                        <ToolbarBtn icon={List} onClick={() => execCmd('insertUnorderedList')} />
-                                        <ToolbarBtn icon={ListOrdered} onClick={() => execCmd('insertOrderedList')} />
-                                        <ToolbarBtn icon={Quote} onClick={() => execCmd('formatBlock', 'blockquote')} />
+                                        <ToolbarBtn icon={List} onClick={() => execCmd('insertUnorderedList')} tooltip="Lista Puntos" />
+                                        <ToolbarBtn icon={ListOrdered} onClick={() => execCmd('insertOrderedList')} tooltip="Lista Numérica" />
+                                        <ToolbarBtn icon={Quote} onClick={() => execCmd('formatBlock', 'blockquote')} tooltip="Cita" />
                                     </div>
-                                    <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+                                    <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-white">
                                         {activeScript.type === 'video' ? (
-                                            <div className="max-w-4xl ml-0 space-y-8 animate-in slide-in-from-left-4 duration-500">
-                                                <div className="space-y-3">
-                                                    <label className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em] pl-1">Hook Principal</label>
+                                            <div className="max-w-3xl space-y-8 animate-in slide-in-from-bottom-2 duration-500">
+                                                <div className="space-y-4">
+                                                    <label className="text-[10px] font-black text-zinc-300 uppercase tracking-[0.2em] pl-1 flex items-center gap-2">
+                                                        <Target className="w-3 h-3" /> Hook Principal
+                                                    </label>
                                                     <input
-                                                        className="w-full text-3xl font-black border-none focus:ring-0 p-0 text-zinc-900 placeholder:text-zinc-200 bg-transparent tracking-tighter"
-                                                        placeholder="El gancho que detendrá el scroll..."
+                                                        className="w-full text-base font-bold border-none focus:ring-0 p-0 text-zinc-900 placeholder:text-zinc-300 bg-transparent tracking-tight leading-relaxed"
+                                                        placeholder="Escribe un gancho potente aquí..."
                                                         value={activeScript.hook}
                                                         onChange={(e) => updateActiveScript({ hook: e.target.value })}
                                                     />
                                                 </div>
                                                 <div className="space-y-4">
-                                                    <label className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em] pl-1">Cuerpo del Contenido</label>
+                                                    <label className="text-[10px] font-black text-zinc-300 uppercase tracking-[0.2em] pl-1 flex items-center gap-2">
+                                                        <FileText className="w-3 h-3" /> Cuerpo del Guion
+                                                    </label>
                                                     <RichTextEditor
                                                         html={activeScript.body}
                                                         onChange={(html: string) => updateActiveScript({ body: html })}
-                                                        className="min-h-[500px] text-xl leading-relaxed text-zinc-800 font-medium"
-                                                        placeholder="Escribe el desarrollo de tu vídeo aquí..."
+                                                        className="min-h-[500px] text-sm leading-relaxed text-zinc-700 font-normal pb-20"
+                                                        placeholder="Desarrolla tu idea aquí..."
                                                     />
                                                 </div>
                                             </div>
                                         ) : (
-                                            <div className="max-w-4xl ml-0 space-y-8 animate-in slide-in-from-left-4 duration-500">
+                                            <div className="max-w-4xl space-y-8 animate-in slide-in-from-bottom-2 duration-500">
                                                 {activeScript.slides.map((slide, i) => (
-                                                    <div key={slide.id} className="flex gap-6 group animate-in slide-in-from-bottom-2 duration-300" style={{ animationDelay: `${i * 50}ms` }}>
+                                                    <div key={slide.id} className="flex gap-6 group">
                                                         <div className="flex flex-col items-center gap-2 pt-4">
-                                                            <span className="text-3xl font-black text-zinc-100 group-hover:text-zinc-200 transition-colors">{String(i + 1).padStart(2, '0')}</span>
+                                                            <span className="text-3xl font-black text-zinc-100 group-hover:text-blue-100 transition-colors">{String(i + 1).padStart(2, '0')}</span>
                                                             <div className="w-[2px] flex-1 bg-zinc-50 group-last:hidden" />
                                                         </div>
-                                                        <div className="flex-1 bg-white border border-zinc-100 rounded-2xl p-6 relative shadow-[0_4px_20px_-10px_rgba(0,0,0,0.05)] focus-within:border-blue-200 focus-within:shadow-md transition-all group/slide">
+                                                        <div className="flex-1 bg-white border border-zinc-100 rounded-2xl p-6 relative shadow-[0_4px_20px_-10px_rgba(0,0,0,0.05)] focus-within:border-blue-200 focus-within:shadow-md transition-all group/slide hover:border-zinc-200">
                                                             <button
                                                                 onClick={() => updateActiveScript({ slides: activeScript.slides.filter(s => s.id !== slide.id) })}
-                                                                className="absolute -top-2 -right-2 p-1.5 bg-white border border-zinc-100 rounded-full text-zinc-300 hover:text-red-500 hover:shadow-sm opacity-0 group-hover/slide:opacity-100 transition-all z-10"
+                                                                className="absolute -top-2 -right-2 p-1.5 bg-white border border-zinc-100 rounded-full text-zinc-300 hover:text-red-500 hover:shadow-sm opacity-0 group-hover/slide:opacity-100 transition-all z-10 scale-90 hover:scale-100"
                                                             >
                                                                 <Trash2 className="w-3.5 h-3.5" />
                                                             </button>
@@ -376,62 +463,64 @@ export default function ScriptsPage() {
                                                                 onChange={(html: string) => {
                                                                     const s = [...activeScript.slides];
                                                                     const idx = s.findIndex(slide_item => slide_item.id === slide.id);
-                                                                    if (idx !== -1) {
-                                                                        s[idx].content = html;
-                                                                        updateActiveScript({ slides: s });
-                                                                    }
+                                                                    if (idx !== -1) { s[idx].content = html; updateActiveScript({ slides: s }); }
                                                                 }}
-                                                                className="text-base leading-relaxed min-h-[60px]"
-                                                                placeholder="Contenido de esta slide..."
+                                                                className="text-sm leading-relaxed min-h-[60px] text-zinc-700"
+                                                                placeholder={`Contenido de la slide ${i + 1}...`}
                                                             />
                                                         </div>
                                                     </div>
                                                 ))}
                                                 <button
-                                                    onClick={() => updateActiveScript({
-                                                        slides: [...activeScript.slides, { id: crypto.randomUUID(), content: "", position: activeScript.slides.length }]
-                                                    })}
-                                                    className="ml-14 flex items-center gap-3 px-6 py-3 bg-zinc-900 text-white rounded-2xl text-xs font-bold shadow-lg shadow-zinc-200 hover:bg-black hover:scale-[1.02] active:scale-95 transition-all"
+                                                    onClick={() => updateActiveScript({ slides: [...activeScript.slides, { id: crypto.randomUUID(), content: "", position: activeScript.slides.length }] })}
+                                                    className="ml-14 flex items-center gap-3 px-6 py-3 bg-zinc-50 text-zinc-500 rounded-xl text-xs font-bold border border-zinc-200 hover:bg-white hover:text-zinc-900 hover:shadow-sm transition-all"
                                                 >
-                                                    <Plus className="w-4 h-4" />
-                                                    Añadir Nueva Slide
+                                                    <Plus className="w-4 h-4" /> Añadir Slide
                                                 </button>
                                             </div>
                                         )}
                                     </div>
                                 </div>
                             ) : (
-                                <div className="flex-1 overflow-y-auto bg-zinc-50/50 p-8 custom-scrollbar">
-                                    <div className="max-w-2xl mx-auto space-y-8 pb-10">
-                                        <div className="bg-white border border-zinc-100 rounded-[24px] p-8 shadow-sm space-y-6 focus-within:border-blue-100 transition-all">
-                                            <div className="flex items-center gap-3 text-xs font-bold text-zinc-400 uppercase tracking-widest">
-                                                <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
-                                                    <Lightbulb className="w-4 h-4" />
-                                                </div>
-                                                Core Strategic Message
+                                // Strategy View (Refactored)
+                                <div className="flex-1 overflow-y-auto bg-[#F8F9FA] p-8 custom-scrollbar">
+                                    <div className="max-w-3xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6 pb-12 animate-in slide-in-from-bottom-4 duration-500">
+                                        <div className="bg-white border border-zinc-200/60 rounded-3xl p-8 relative overflow-hidden group shadow-sm hover:shadow-md transition-all">
+                                            <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
+                                                <Lightbulb className="w-16 h-16 text-blue-500 rotate-12" />
                                             </div>
-                                            <textarea
-                                                className="w-full border-none focus:ring-0 p-0 text-xl font-medium text-zinc-900 placeholder:text-zinc-200 resize-none min-h-[120px] bg-transparent leading-relaxed"
-                                                placeholder="Define el propósito psicológico y emocional de esta pieza..."
-                                                value={activeScript.strategy_message}
-                                                onChange={(e) => updateActiveScript({ strategy_message: e.target.value })}
-                                            />
+                                            <div className="relative z-10 flex flex-col h-full">
+                                                <h3 className="text-sm font-black text-zinc-900 uppercase tracking-wide mb-2 flex items-center gap-2">
+                                                    <Target className="w-4 h-4 text-blue-500" />
+                                                    Mensaje Estratégico
+                                                </h3>
+                                                <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider mb-6">El "Por Qué" de este contenido</p>
+                                                <textarea
+                                                    className="flex-1 w-full border border-transparent hover:border-zinc-100 bg-zinc-50/50 rounded-xl p-4 text-sm font-medium text-zinc-700 placeholder:text-zinc-300 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/10 focus:bg-white transition-all leading-relaxed"
+                                                    placeholder="Define el propósito psicológico y emocional de esta pieza..."
+                                                    value={activeScript.strategy_message}
+                                                    onChange={(e) => updateActiveScript({ strategy_message: e.target.value })}
+                                                />
+                                            </div>
                                         </div>
-                                        <div className="bg-white border border-zinc-100 rounded-[24px] p-8 shadow-sm space-y-6 focus-within:border-blue-100 transition-all">
-                                            <div className="flex items-center gap-3 text-xs font-bold text-zinc-400 uppercase tracking-widest">
-                                                <div className="w-8 h-8 rounded-xl bg-purple-50 flex items-center justify-center text-purple-600">
-                                                    <ListOrdered className="w-4 h-4" />
-                                                </div>
-                                                Key Content Points
+
+                                        <div className="bg-white border border-zinc-200/60 rounded-3xl p-8 relative overflow-hidden group shadow-sm hover:shadow-md transition-all">
+                                            <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
+                                                <ListOrdered className="w-16 h-16 text-purple-500 -rotate-12" />
                                             </div>
-                                            <textarea
-                                                className="w-full border-none focus:ring-0 p-0 text-sm font-medium text-zinc-600 placeholder:text-zinc-200 resize-none min-h-[180px] bg-transparent leading-loose"
-                                                placeholder="• Punto 1: Conecta con el problema
-• Punto 2: Presenta la solución
-• Punto 3: Call to Action"
-                                                value={activeScript.strategy_bullets}
-                                                onChange={(e) => updateActiveScript({ strategy_bullets: e.target.value })}
-                                            />
+                                            <div className="relative z-10 flex flex-col h-full">
+                                                <h3 className="text-sm font-black text-zinc-900 uppercase tracking-wide mb-2 flex items-center gap-2">
+                                                    <List className="w-4 h-4 text-purple-500" />
+                                                    Puntos Clave
+                                                </h3>
+                                                <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider mb-6">Estructura del argumento</p>
+                                                <textarea
+                                                    className="flex-1 w-full border border-transparent hover:border-zinc-100 bg-zinc-50/50 rounded-xl p-4 text-sm font-medium text-zinc-700 placeholder:text-zinc-300 resize-none focus:outline-none focus:ring-2 focus:ring-purple-500/10 focus:bg-white transition-all leading-relaxed"
+                                                    placeholder="• Punto 1: Conecta con el problema..."
+                                                    value={activeScript.strategy_bullets}
+                                                    onChange={(e) => updateActiveScript({ strategy_bullets: e.target.value })}
+                                                />
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -440,124 +529,156 @@ export default function ScriptsPage() {
                     )}
                 </div>
 
-                {/* --- References Panel --- */}
+                {/* --- References Panel (With Animations) --- */}
                 {showGlobalReferences && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-end p-6 animate-in fade-in duration-300">
-                        <div className="absolute inset-0 bg-black/5 blur-sm" onClick={() => setShowGlobalReferences(false)} />
-                        <div className="w-[450px] h-full bg-white border border-zinc-200 rounded-[32px] shadow-[0_40px_100px_rgba(0,0,0,0.1)] flex flex-col overflow-hidden relative animate-in slide-in-from-right-8 duration-500">
-                            <div className="p-6 border-b border-zinc-100 flex items-center justify-between bg-white/50 backdrop-blur shrink-0">
+                    <div className="fixed inset-0 z-[100] flex justify-end">
+                        <div className="absolute inset-0 bg-zinc-900/20 backdrop-blur-sm animate-in fade-in duration-300" onClick={() => setShowGlobalReferences(false)} />
+                        <div className="w-[420px] h-full bg-white shadow-2xl relative z-10 flex flex-col animate-in slide-in-from-right duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]">
+                            <div className="p-6 border-b border-zinc-100 flex items-center justify-between bg-white shrink-0">
                                 <div>
-                                    <h4 className="font-extrabold text-sm text-zinc-900">Referencias</h4>
-                                    <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">Inspiración guardada</p>
+                                    <h4 className="font-extrabold text-base text-zinc-900 flex items-center gap-2">
+                                        <Globe className="w-4 h-4 text-blue-500" /> Referencias
+                                    </h4>
+                                    <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider mt-1">Tu banco de inspiración</p>
                                 </div>
-                                <button onClick={() => setShowGlobalReferences(false)} className="p-1.5 rounded-lg hover:bg-zinc-100 text-zinc-400 transition-all"><X className="w-4 h-4" /></button>
+                                <button onClick={() => setShowGlobalReferences(false)} className="p-2 rounded-full hover:bg-zinc-100 text-zinc-400 transition-all"><X className="w-5 h-5" /></button>
                             </div>
 
-                            <div className="p-4 flex-1 overflow-y-auto custom-scrollbar space-y-4">
-                                <div className="relative">
-                                    <input
-                                        type="file"
-                                        id="ref-upload"
-                                        className="hidden"
-                                        accept="image/*"
-                                        onChange={async (e) => {
-                                            const file = e.target.files?.[0];
-                                            if (!file || !session?.user?.id) return;
-                                            setLoadingInspo(true);
-                                            const path = `${session.user.id}/${Date.now()}_${file.name}`;
-                                            const { data, error } = await supabase.storage.from('references').upload(path, file);
-                                            if (data) {
-                                                const { data: { publicUrl } } = supabase.storage.from('references').getPublicUrl(path);
-                                                await supabase.from('inspiration').insert({
-                                                    user_id: session.user.id,
-                                                    title: file.name,
-                                                    image_url: publicUrl,
-                                                    type: 'image'
-                                                });
-                                                fetchInspiration();
-                                            }
-                                            setLoadingInspo(false);
-                                        }}
-                                    />
-                                    <button
-                                        onClick={() => document.getElementById('ref-upload')?.click()}
-                                        className="w-full py-8 rounded-2xl border-2 border-dashed border-zinc-100 text-zinc-300 hover:border-blue-100 hover:bg-blue-50/50 hover:text-blue-500 transition-all flex flex-col items-center justify-center gap-3 group"
-                                    >
-                                        <div className="w-12 h-12 rounded-2xl bg-zinc-50 group-hover:bg-white flex items-center justify-center shadow-sm transition-all">
-                                            <Plus className="w-6 h-6" />
-                                        </div>
-                                        <span className="text-[10px] font-black uppercase tracking-[0.2em]">Subir Referencia Visual</span>
-                                    </button>
+                            <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
+                                <div className="space-y-4">
+                                    <label className="text-[10px] font-black text-zinc-300 uppercase tracking-[0.2em]">Añadir Nueva</label>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <button onClick={() => document.getElementById('ref-upload')?.click()} className="flex items-center gap-3 p-4 rounded-xl border border-dashed border-zinc-200 text-zinc-400 hover:text-blue-500 hover:border-blue-200 hover:bg-blue-50 transition-all active:scale-95 text-xs font-bold text-left">
+                                            <ImageIcon className="w-5 h-5" /> Subir Imagen
+                                        </button>
+                                        <input
+                                            type="file"
+                                            id="ref-upload"
+                                            className="hidden"
+                                            accept="image/*"
+                                            onChange={async (e) => {
+                                                const file = e.target.files?.[0];
+                                                if (!file || !session?.user?.id) return;
+                                                setLoadingInspo(true);
+                                                try {
+                                                    const path = `${session.user.id}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9]/g, '_')}`;
+                                                    const { data, error } = await supabase.storage.from('references').upload(path, file);
+
+                                                    if (data) {
+                                                        const { data: { publicUrl } } = supabase.storage.from('references').getPublicUrl(path);
+                                                        await supabase.from('inspiration').insert({
+                                                            user_id: session.user.id,
+                                                            title: file.name,
+                                                            image_url: publicUrl,
+                                                            type: 'image'
+                                                        });
+                                                        await fetchInspiration();
+                                                    }
+                                                } finally {
+                                                    setLoadingInspo(false);
+                                                }
+                                            }}
+                                        />
+                                        <button className="flex items-center gap-3 p-4 rounded-xl border border-dashed border-zinc-200 text-zinc-400 hover:text-purple-500 hover:border-purple-200 hover:bg-purple-50 transition-all active:scale-95 text-xs font-bold text-left">
+                                            <ExternalLink className="w-5 h-5" /> Guardar URL
+                                        </button>
+                                    </div>
                                 </div>
 
-                                {loadingInspo ? (
-                                    <div className="flex justify-center py-12"><Loader2 className="w-5 h-5 animate-spin text-zinc-200" /></div>
-                                ) : inspirationItems.length === 0 ? (
-                                    <div className="text-center py-12">
-                                        <ImageIcon className="w-8 h-8 text-zinc-100 mx-auto mb-3" />
-                                        <p className="text-[10px] font-bold text-zinc-300 uppercase tracking-widest leading-loose">No hay referencias<br />guardadas aún</p>
-                                    </div>
-                                ) : (
-                                    <div className="grid grid-cols-1 gap-4">
-                                        {inspirationItems.map(item => (
-                                            <div key={item.id} className="group/item relative bg-zinc-50 border border-zinc-100 rounded-2xl overflow-hidden hover:shadow-lg hover:shadow-zinc-200/50 transition-all">
-                                                {item.image_url ? (
-                                                    <div className="aspect-[4/5] bg-zinc-200 relative overflow-hidden">
-                                                        <img src={item.image_url} alt={item.title} className="w-full h-full object-cover transition-transform duration-500 group-hover/item:scale-110" />
-                                                        <div className="absolute inset-0 bg-black/0 group-hover/item:bg-black/20 transition-all flex items-center justify-center opacity-0 group-hover/item:opacity-100">
-                                                            <div className="p-2 bg-white rounded-full shadow-xl transform translate-y-4 group-hover/item:translate-y-0 transition-all">
-                                                                <ExternalLink className="w-4 h-4 text-zinc-900" />
+                                <div className="space-y-4">
+                                    <label className="text-[10px] font-black text-zinc-300 uppercase tracking-[0.2em]">Guardadas</label>
+                                    {loadingInspo ? (
+                                        <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-zinc-200" /></div>
+                                    ) : inspirationItems.length === 0 ? (
+                                        <div className="text-center py-10 opacity-30 border border-dashed border-zinc-200 rounded-xl">
+                                            <p className="text-xs font-bold">Vacío</p>
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-1 gap-4">
+                                            {inspirationItems.map((item, i) => (
+                                                <div key={item.id} className="group relative rounded-xl overflow-hidden border border-zinc-100 hover:shadow-lg transition-all bg-white animate-in slide-in-from-right-4 duration-500" style={{ animationDelay: `${i * 50}ms` }}>
+                                                    {item.image_url ? (
+                                                        <div className="aspect-square relative">
+                                                            <img src={item.image_url} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                                            <a href={item.image_url} target="_blank" className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                                                <ExternalLink className="w-6 h-6 text-white drop-shadow-md" />
+                                                            </a>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="p-4 flex items-center gap-3">
+                                                            <div className="w-10 h-10 rounded-lg bg-zinc-50 flex items-center justify-center border border-zinc-100 text-zinc-400">
+                                                                <Globe className="w-5 h-5" />
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className="text-xs font-bold truncate text-zinc-900">{item.title}</p>
+                                                                <p className="text-[10px] text-zinc-400">Enlace</p>
                                                             </div>
                                                         </div>
-                                                    </div>
-                                                ) : (
-                                                    <div className="p-4 flex items-center gap-3">
-                                                        <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center border border-zinc-100 shadow-sm text-zinc-400">
-                                                            {item.type === 'video' ? <FileText className="w-4 h-4" /> : <Globe className="w-4 h-4" />}
-                                                        </div>
-                                                        <div className="flex-1 min-w-0">
-                                                            <p className="text-xs font-bold text-zinc-900 truncate">{item.title}</p>
-                                                            <p className="text-[10px] text-zinc-400 font-medium uppercase tracking-tight">{item.type}</p>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                                {item.url && (
-                                                    <a href={item.url} target="_blank" rel="noopener noreferrer" className="absolute inset-0 z-10" />
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </div>
                 )}
 
-                {/* --- Modal --- */}
+                {/* --- Schedule Modal (with Visual Calendar) --- */}
                 {showScheduleModal && activeScript && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-md px-4 animate-in fade-in duration-300">
-                        <div className="bg-white rounded-[32px] shadow-2xl w-full max-w-sm p-8 space-y-8 animate-in zoom-in-95 duration-300 border border-white/20">
-                            <div className="flex justify-between items-center">
-                                <h3 className="text-xl font-extrabold text-zinc-900 tracking-tight">Agendar</h3>
-                                <button onClick={() => setShowScheduleModal(false)} className="p-2 rounded-xl hover:bg-zinc-100 text-zinc-400 transition-all"><X className="w-5 h-5" /></button>
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-zinc-900/60 backdrop-blur-sm px-4 animate-in fade-in duration-300">
+                        <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95 duration-300 overflow-hidden relative">
+                            <div className="flex justify-between items-center mb-6 pl-2">
+                                <h3 className="text-xl font-black text-zinc-900 tracking-tight">Agendar Publicación</h3>
+                                <button onClick={() => setShowScheduleModal(false)} className="p-2 rounded-full hover:bg-zinc-100 transition-all"><X className="w-5 h-5 text-zinc-400" /></button>
                             </div>
-                            <div className="space-y-4">
-                                <div className="flex items-center gap-2 text-xs font-bold text-zinc-400 uppercase tracking-[0.15em] pl-1">
-                                    <CalendarIcon className="w-3.5 h-3.5" />
-                                    Fecha Seleccionada
+
+                            <div className="bg-zinc-50 rounded-3xl p-6 mb-6 border border-zinc-100">
+                                <div className="flex items-center justify-between mb-6">
+                                    <button onClick={() => setCalendarMonth(new Date(calendarMonth.setMonth(calendarMonth.getMonth() - 1)))} className="p-1 hover:bg-white rounded-lg transition-all"><ChevronLeft className="w-4 h-4 text-zinc-400" /></button>
+                                    <span className="text-sm font-black text-zinc-900 capitalize">{calendarMonth.toLocaleString('es-ES', { month: 'long', year: 'numeric' })}</span>
+                                    <button onClick={() => setCalendarMonth(new Date(calendarMonth.setMonth(calendarMonth.getMonth() + 1)))} className="p-1 hover:bg-white rounded-lg transition-all"><ChevronRight className="w-4 h-4 text-zinc-400" /></button>
                                 </div>
-                                <input
-                                    type="date"
-                                    className="w-full bg-zinc-50 border border-zinc-100 rounded-2xl p-4 text-sm font-bold text-zinc-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none"
-                                    value={activeScript.scheduled_date || ""}
-                                    onChange={(e) => updateActiveScript({ scheduled_date: e.target.value })}
-                                />
+                                <div className="grid grid-cols-7 gap-1 text-center mb-2">
+                                    {['L', 'M', 'X', 'J', 'V', 'S', 'D'].map(d => <span key={d} className="text-[10px] font-bold text-zinc-300">{d}</span>)}
+                                </div>
+                                <div className="grid grid-cols-7 gap-1">
+                                    {getDaysInMonth(calendarMonth).map((d, i) => {
+                                        if (!d) return <div key={i} />;
+
+                                        // Use local date string for consistent comparison and key
+                                        const year = d.getFullYear();
+                                        const month = String(d.getMonth() + 1).padStart(2, '0');
+                                        const day = String(d.getDate()).padStart(2, '0');
+                                        const localDateString = `${year}-${month}-${day}`;
+
+                                        const isSelected = activeScript.scheduled_date === localDateString;
+
+                                        return (
+                                            <button
+                                                key={localDateString}
+                                                onClick={() => {
+                                                    updateActiveScript({ scheduled_date: localDateString });
+                                                }}
+                                                className={cn(
+                                                    "w-8 h-8 rounded-lg flex items-center justify-center text-xs font-semibold mx-auto transition-all relative",
+                                                    isSelected ? "bg-zinc-900 text-white shadow-lg scale-110 z-10" : "text-zinc-600 hover:bg-white hover:shadow-sm"
+                                                )}
+                                            >
+                                                {d.getDate()}
+                                                {isSelected && <div className="absolute -bottom-1 w-1 h-1 bg-zinc-900 rounded-full" />}
+                                            </button>
+                                        )
+                                    })}
+                                </div>
                             </div>
+
                             <button
                                 onClick={() => setShowScheduleModal(false)}
-                                className="w-full py-4 bg-zinc-900 text-white rounded-2xl font-extrabold text-sm shadow-xl shadow-zinc-200 hover:bg-black hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2"
+                                className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold text-sm shadow-xl shadow-blue-500/20 hover:bg-blue-700 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2"
                             >
-                                <Check className="w-4 h-4" />
+                                <Check className="w-5 h-5" />
                                 Confirmar Fecha
                             </button>
                         </div>
@@ -565,22 +686,28 @@ export default function ScriptsPage() {
                 )}
 
                 <style jsx global>{`
-                .custom-scrollbar::-webkit-scrollbar {
-                    width: 4px;
-                }
-                .custom-scrollbar::-webkit-scrollbar-track {
-                    background: transparent;
-                }
-                .custom-scrollbar::-webkit-scrollbar-thumb {
-                    background: #E4E4E7;
-                    border-radius: 10px;
-                }
-                .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-                    background: #D4D4D8;
-                }
-            `}</style>
+                    .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+                    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+                    .custom-scrollbar::-webkit-scrollbar-thumb { background: #E4E4E7; border-radius: 10px; }
+                    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #D4D4D8; }
+                `}</style>
             </div>
         </div>
+    );
+}
+
+function ToolbarBtn({ icon: Icon, onClick, tooltip }: any) {
+    return (
+        <button
+            onMouseDown={(e) => {
+                e.preventDefault(); // Prevent focus loss!
+                onClick();
+            }}
+            className="p-2 rounded-lg text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 transition-all active:scale-90"
+            title={tooltip}
+        >
+            <Icon className="w-4 h-4" strokeWidth={2.5} />
+        </button>
     );
 }
 
@@ -588,7 +715,11 @@ function RichTextEditor({ html, onChange, className, placeholder }: any) {
     const editorRef = useRef<HTMLDivElement>(null);
     useEffect(() => {
         if (editorRef.current && editorRef.current.innerHTML !== html) {
-            editorRef.current.innerHTML = html;
+            // Only update if significantly different to avoid cursor jumps
+            // Simple interaction check might be needed or just brute force
+            if (document.activeElement !== editorRef.current) {
+                editorRef.current.innerHTML = html;
+            }
         }
     }, [html]);
 
@@ -598,22 +729,11 @@ function RichTextEditor({ html, onChange, className, placeholder }: any) {
             contentEditable
             onInput={() => editorRef.current && onChange(editorRef.current.innerHTML)}
             className={cn(
-                "outline-none empty:before:content-[attr(data-placeholder)] empty:before:text-zinc-200 focus:empty:before:text-zinc-100 transition-all",
+                "outline-none empty:before:content-[attr(data-placeholder)] empty:before:text-zinc-300 focus:empty:before:text-zinc-200 transition-all cursor-text",
                 className
             )}
             data-placeholder={placeholder}
+            spellCheck={false}
         />
-    );
-}
-
-function ToolbarBtn({ icon: Icon, onClick }: any) {
-    return (
-        <button
-            onClick={onClick}
-            className="p-2.5 rounded-xl text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 transition-all transform active:scale-90"
-            onMouseDown={(e) => e.preventDefault()}
-        >
-            <Icon className="w-4 h-4" strokeWidth={2.5} />
-        </button>
     );
 }

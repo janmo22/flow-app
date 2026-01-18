@@ -1,106 +1,177 @@
-import { FileText, Clock, Plus, Zap, ArrowUpRight, Play, PenTool, Layout as LayoutIcon, TrendingUp, Calendar } from "lucide-react";
+import { createClient } from "@/lib/supabase-server";
+import { PenTool, Calendar, Users, Layout, ChevronRight, Clock, ArrowUpRight, FileText } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { redirect } from "next/navigation";
 
-export default function Home() {
+// Helper to get current month range
+function getMonthRange() {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString();
+  return { start, end, monthName: now.toLocaleString('es-ES', { month: 'long' }) };
+}
+
+export const dynamic = 'force-dynamic';
+
+export default async function Home() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect('/auth');
+  }
+
+  const { start, end, monthName } = getMonthRange();
+
+  // 1. Fetch Latest Scripts (Limit 5)
+  const { data: recentScripts } = await supabase
+    .from('scripts')
+    .select('*')
+    .eq('user_id', user.id)
+    .is('deleted_at', null)
+    .order('updated_at', { ascending: false })
+    .limit(5);
+
+  // 2. Fetch Monthly Events
+  const { data: calendarEvents } = await supabase
+    .from('calendar_events')
+    .select('*')
+    .eq('user_id', user.id)
+    .gte('date', start)
+    .lte('date', end)
+    .is('deleted_at', null);
+
+  const { data: scheduledScripts } = await supabase
+    .from('scripts')
+    .select('id, title, type, scheduled_date')
+    .eq('user_id', user.id)
+    .gte('scheduled_date', start)
+    .lte('scheduled_date', end)
+    .is('deleted_at', null)
+    .not('scheduled_date', 'is', null);
+
+  const events = [
+    ...(calendarEvents || []).map((e: any) => ({ ...e, source: 'event' })),
+    ...(scheduledScripts || []).map((s: any) => ({
+      id: s.id,
+      title: s.title,
+      date: s.scheduled_date!,
+      type: s.type,
+      source: 'script'
+    }))
+  ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+
   return (
-    <div className="max-w-[1400px] mx-auto p-8 animate-in fade-in duration-500">
+    <div className="max-w-[1400px] mx-auto min-h-screen p-8 pt-12 animate-in fade-in duration-700 font-sans text-zinc-900">
 
-      {/* Page Title & Actions */}
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-xl font-bold text-zinc-900 flex items-center gap-2">
-          <LayoutIcon className="w-5 h-5 text-zinc-400" />
-          Control Center
-        </h1>
-        <div className="flex items-center gap-4 text-sm text-zinc-500">
-          <span>{new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
+      {/* Header */}
+      <header className="mb-12 flex items-end justify-between border-b border-zinc-100 pb-8">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight mb-2">
+            Hola, {user.user_metadata?.name || 'Creador'}
+          </h1>
+          <p className="text-zinc-500 font-medium">
+            Resumen de tu actividad.
+          </p>
         </div>
-      </div>
+        <div className="text-right hidden md:block">
+          <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest">{new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+        </div>
+      </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+      {/* Main Grid: 12 Cols */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
 
-        {/* COL 1: Main Focus (Span 8) */}
-        <div className="md:col-span-8 flex flex-col gap-6">
-
-          {/* KPI Cards Row */}
-          <div className="grid grid-cols-3 gap-4">
-            <KpiCard title="Guiones Activos" value="3" icon={FileText} />
-            <KpiCard title="Ideas Banco" value="28" icon={Zap} />
-            <KpiCard title="Engagement" value="+12%" icon={TrendingUp} trend />
+        {/* COL 1: Navigation (3 Cols) */}
+        <div className="lg:col-span-3 space-y-8">
+          <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest px-2">Menú</h3>
+          <div className="flex flex-col gap-2">
+            <NavItem href="/strategy" icon={Layout} label="Estrategia" />
+            <NavItem href="/scripts" icon={PenTool} label="Studio" />
+            <NavItem href="/calendar" icon={Calendar} label="Calendario" />
+            <NavItem href="/competencia" icon={Users} label="Competencia" />
           </div>
 
-          {/* Active Projects Large Card */}
-          <div className="flex-1 bg-white border border-zinc-200 rounded-2xl p-6 shadow-sm flex flex-col">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-bold text-zinc-900">Producción en Curso</h2>
-              <button className="text-sm font-medium text-blue-600 hover:text-blue-700">Ver Calendario</button>
-            </div>
-
-            <div className="space-y-4">
-              <ProjectRow
-                title="Cómo usar IA para guiones"
-                status="Escribiendo"
-                date="Jue, 16 Ene"
-                progress={45}
-              />
-              <ProjectRow
-                title="Estrategia 2026: Deep Dive"
-                status="Grabación"
-                date="Lun, 20 Ene"
-                progress={80}
-              />
-              <ProjectRow
-                title="Tutorial Flow OS"
-                status="Edición"
-                date="Mañna"
-                progress={90}
-              />
-            </div>
+          <div className="pt-8 border-t border-zinc-100">
+            <Link href="/scripts/new" className="flex items-center justify-center w-full py-3 bg-zinc-900 text-white rounded-lg font-bold text-sm hover:bg-zinc-800 transition-colors">
+              Nuevo Guion
+            </Link>
           </div>
-
         </div>
 
-        {/* COL 2: Quick Actions & Sidebar Widgets (Span 4) */}
-        <div className="md:col-span-4 flex flex-col gap-6">
-
-          {/* Quick Action: New Idea (Highlight Widget) */}
-          <button className="w-full bg-zinc-900 text-white rounded-2xl p-6 shadow-lg shadow-zinc-900/10 hover:bg-zinc-800 hover:scale-[1.02] transition-all duration-200 text-left group relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
-              <Zap className="w-24 h-24" />
-            </div>
-            <div className="relative z-10">
-              <div className="w-10 h-10 bg-zinc-800 rounded-full flex items-center justify-center mb-4 group-hover:bg-zinc-700 transition-colors">
-                <Plus className="w-5 h-5" />
-              </div>
-              <h3 className="text-lg font-bold mb-1">Capturar Idea</h3>
-              <p className="text-zinc-400 text-sm">Guardar rápido en el inbox.</p>
-            </div>
-          </button>
-
-          {/* Quick Links / Shortcuts */}
-          <div className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-sm">
-            <h3 className="font-semibold text-zinc-900 mb-4 text-sm uppercase tracking-wider">Accesos Directos</h3>
-            <div className="grid grid-cols-2 gap-3">
-              <QuickShortcut href="/strategy" icon={ArrowUpRight} label="Estrategia" />
-              <QuickShortcut href="/scripts" icon={FileText} label="Editor" />
-              <QuickShortcut href="/calendar" icon={Calendar} label="Agenda" />
-              <QuickShortcut href="/inspiration" icon={Play} label="Inspiración" />
-            </div>
+        {/* COL 2: Recent Scripts (5 Cols) */}
+        <div className="lg:col-span-5 space-y-6">
+          <div className="flex items-center justify-between px-2">
+            <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Últimos Guiones</h3>
+            <Link href="/scripts" className="text-xs font-medium text-zinc-400 hover:text-zinc-900 flex items-center gap-1 transition-colors">
+              Ver todos <ChevronRight className="w-3 h-3" />
+            </Link>
           </div>
 
-          {/* Mini Notification / Update */}
-          <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5">
-            <div className="flex items-start gap-3">
-              <div className="w-2 h-2 mt-1.5 rounded-full bg-blue-500 shrink-0" />
-              <div>
-                <p className="text-sm font-medium text-blue-900 mb-1">Recordatorio Semanal</p>
-                <p className="text-xs text-blue-700 leading-relaxed">
-                  Revisar métricas de la semana pasada antes de la reunión de mañana.
-                </p>
+          <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-sm">
+            {(recentScripts || []).length === 0 ? (
+              <div className="p-12 text-center">
+                <p className="text-sm text-zinc-400 font-medium">No hay guiones recientes.</p>
               </div>
-            </div>
+            ) : (
+              <div className="divide-y divide-zinc-100">
+                {recentScripts?.map((script) => (
+                  <Link key={script.id} href={`/scripts?id=${script.id}`} className="block p-4 hover:bg-zinc-50 transition-colors group">
+                    <div className="flex items-center justify-between mb-1">
+                      <h4 className="font-bold text-sm text-zinc-900 group-hover:text-blue-600 transition-colors truncate">{script.title || "Sin título"}</h4>
+                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-500 uppercase tracking-wide">{script.type}</span>
+                    </div>
+                    <p className="text-xs text-zinc-400 line-clamp-1">
+                      {new Date(script.updated_at).toLocaleDateString()} · {script.status === 'draft' ? 'Borrador' : 'Publicado'}
+                    </p>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* COL 3: Monthly Events (4 Cols) */}
+        <div className="lg:col-span-4 space-y-6">
+          <div className="flex items-center justify-between px-2">
+            <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Agenda {monthName}</h3>
+            <Link href="/calendar" className="p-1 hover:bg-zinc-100 rounded-md text-zinc-400 transition-colors">
+              <ArrowUpRight className="w-4 h-4" />
+            </Link>
           </div>
 
+          <div className="bg-zinc-50/50 rounded-xl p-6 min-h-[400px] border border-zinc-100">
+            {events.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-center space-y-3 opacity-40">
+                <div className="w-10 h-10 rounded-full bg-zinc-200/50 flex items-center justify-center">
+                  <Clock className="w-5 h-5 text-zinc-400" />
+                </div>
+                <p className="text-xs font-medium text-zinc-500">Nada programado para este mes.</p>
+              </div>
+            ) : (
+              <div className="space-y-6 relative before:absolute before:left-[7px] before:top-2 before:bottom-2 before:w-px before:bg-zinc-200">
+                {events.map((event) => (
+                  <div key={`${event.source}-${event.id}`} className="relative pl-6">
+                    <div className="absolute left-[3px] top-1.5 w-2.5 h-2.5 rounded-full border-2 border-white bg-zinc-300 ring-1 ring-zinc-100" />
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide block">
+                        {new Date(event.date).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' })}
+                      </span>
+                      <p className="text-sm font-bold text-zinc-800 leading-tight">
+                        {event.title}
+                      </p>
+                      <p className="text-[10px] text-zinc-500 capitalize flex items-center gap-1.5">
+                        {event.source === 'script' ? <FileText className="w-3 h-3" /> : <Calendar className="w-3 h-3" />}
+                        {event.type}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
       </div>
@@ -108,44 +179,15 @@ export default function Home() {
   );
 }
 
-function KpiCard({ title, value, icon: Icon, trend }: any) {
+function NavItem({ href, icon: Icon, label }: any) {
   return (
-    <div className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-sm relative overflow-hidden group hover:border-blue-300 transition-colors">
-      <div className="flex justify-between items-start mb-2">
-        <span className="text-zinc-500 text-xs font-medium uppercase tracking-wider">{title}</span>
-        <Icon className="w-4 h-4 text-zinc-300 group-hover:text-blue-500 transition-colors" />
-      </div>
-      <div className="text-2xl font-bold text-zinc-900">{value}</div>
-    </div>
-  )
-}
-
-function ProjectRow({ title, status, date, progress }: any) {
-  return (
-    <div className="flex items-center justify-between p-3 rounded-xl hover:bg-zinc-50 transition-colors group cursor-pointer border border-transparent hover:border-zinc-200">
-      <div className="flex items-center gap-4">
-        <div className="w-10 h-10 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-500 group-hover:bg-white group-hover:text-blue-600 border border-transparent group-hover:border-zinc-200 transition-all font-bold text-xs">
-          EP
-        </div>
-        <div>
-          <h4 className="font-semibold text-zinc-900 text-sm">{title}</h4>
-          <p className="text-xs text-zinc-500">{status} • {date}</p>
-        </div>
-      </div>
-      <div className="flex items-center gap-4">
-        <div className="w-24 h-1.5 bg-zinc-100 rounded-full overflow-hidden">
-          <div className="h-full bg-zinc-800 rounded-full" style={{ width: `${progress}%` }}></div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function QuickShortcut({ href, icon: Icon, label }: any) {
-  return (
-    <Link href={href} className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl bg-zinc-50 hover:bg-blue-50 border border-zinc-100 hover:border-blue-200 transition-all group">
-      <Icon className="w-5 h-5 text-zinc-400 group-hover:text-blue-600 transition-colors" />
-      <span className="text-xs font-medium text-zinc-600 group-hover:text-blue-700">{label}</span>
+    <Link
+      href={href}
+      className="group flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-zinc-50 transition-all border border-transparent hover:border-zinc-200/60"
+    >
+      <Icon className="w-4 h-4 text-zinc-400 group-hover:text-zinc-900 transition-colors" />
+      <span className="text-sm font-medium text-zinc-600 group-hover:text-zinc-900">{label}</span>
+      <ChevronRight className="w-4 h-4 text-zinc-300 ml-auto opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0" />
     </Link>
   )
 }
