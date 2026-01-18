@@ -48,9 +48,9 @@ export function AddCompetitorDialog() {
     }
 
     return (
-        <div className="fixed inset-0 z-[100] grid place-items-center p-4 bg-zinc-950/60 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[9999] grid place-items-center p-4 bg-zinc-950/60 backdrop-blur-sm animate-in fade-in duration-200">
             {/* Modal Content */}
-            <div className="relative w-full max-w-sm bg-white rounded-xl shadow-2xl animate-in zoom-in-95 slide-in-from-bottom-2 duration-200 overflow-hidden mx-auto my-auto">
+            <div className="relative w-full max-w-sm bg-white rounded-xl shadow-2xl animate-in zoom-in-95 slide-in-from-bottom-2 duration-200 overflow-hidden mx-auto my-auto ring-1 ring-zinc-200">
 
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100 bg-zinc-50/50">
@@ -85,7 +85,7 @@ export function AddCompetitorDialog() {
                         </div>
 
                         {error && (
-                            <div className="p-3 bg-red-50 border border-red-100 text-red-600 text-xs font-medium rounded-lg">
+                            <div className="p-3 bg-red-50 border border-red-100 text-red-600 text-xs font-medium rounded-lg animate-in fade-in slide-in-from-top-1">
                                 {error}
                             </div>
                         )}
@@ -108,7 +108,7 @@ export function AddCompetitorDialog() {
                                 )}
                             >
                                 {isLoading && <Loader2 className="w-3 h-3 animate-spin" />}
-                                Guardar
+                                {isLoading ? 'Guardando...' : 'Guardar'}
                             </button>
                         </div>
                     </div>
