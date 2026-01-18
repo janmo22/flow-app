@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { Plus, Loader2, Link as LinkIcon, Instagram, X } from 'lucide-react'
 import { addCompetitor } from '@/app/actions/competitors'
 import { useRouter } from 'next/navigation'
@@ -35,6 +36,13 @@ export function AddCompetitorDialog() {
         }
     }
 
+    const [mounted, setMounted] = useState(false)
+
+    useEffect(() => {
+        setMounted(true)
+        return () => setMounted(false)
+    }, [])
+
     if (!isOpen) {
         return (
             <button
@@ -47,7 +55,10 @@ export function AddCompetitorDialog() {
         )
     }
 
-    return (
+    if (!mounted) return null
+
+    // Portal to body to leave any stacking context
+    return createPortal(
         <div className="fixed inset-0 z-[9999] grid place-items-center p-4 bg-zinc-950/60 backdrop-blur-sm animate-in fade-in duration-200">
             {/* Modal Content */}
             <div className="relative w-full max-w-sm bg-white rounded-xl shadow-2xl animate-in zoom-in-95 slide-in-from-bottom-2 duration-200 overflow-hidden mx-auto my-auto ring-1 ring-zinc-200">
@@ -114,6 +125,7 @@ export function AddCompetitorDialog() {
                     </div>
                 </form>
             </div>
-        </div>
+        </div>,
+        document.body
     )
 }
