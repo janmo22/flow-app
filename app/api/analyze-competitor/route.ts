@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { ApifyClient } from 'apify-client';
-import { createClient } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase-server';
 
 export async function POST(req: Request) {
     try {
@@ -65,7 +65,7 @@ export async function POST(req: Request) {
                 scraped_at: new Date().toISOString()
             };
 
-            const supabase = createClient();
+            const supabase = await createClient();
 
             const { data: currentData } = await supabase
                 .from('competitors')
@@ -136,7 +136,7 @@ export async function POST(req: Request) {
                 timestamp: item.timestamp,
             })).slice(0, 20);
 
-            const supabase = createClient();
+            const supabase = await createClient();
 
             const { data: currentData } = await supabase
                 .from('competitors')
