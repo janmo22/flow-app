@@ -65,24 +65,12 @@ export default function StrategyPage() {
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
     // Effect to auto-collapse on Formats
+    // Removed to avoid type error since 'formats' is no longer in SectionId main union
+    /* 
     useEffect(() => {
-        if (activeSection === 'formats') {
-            setIsSidebarOpen(false);
-        } else {
-            // Optional: Auto-open when leaving formats? Or keep user preference?
-            // reimplementing logic: if user manually closed it, keep it closed. 
-            // But for 'formats', we force close initially or just once?
-            // Let's just set it to false when entering formats.
-            // And maybe true when entering others IF it was closed by system? 
-            // For now, simpler: Just auto-collapse on Formats.
-            if (activeSection !== 'formats' && !isSidebarOpen) {
-                // Maybe don't auto-open to respect user choice, 
-                // but the requirement says "Auto-minimize on 'Formats'".
-                // It implies the opposite might be desired or just specific to Formats.
-                // Let's leave manual control for opening.
-            }
-        }
+       // Logic removed
     }, [activeSection]);
+    */
 
     // UI State
     const [showCreateFormatModal, setShowCreateFormatModal] = useState(false);
