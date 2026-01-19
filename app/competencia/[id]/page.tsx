@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase-server";
 import { notFound } from "next/navigation";
 import { SyncCompetitorButton } from "@/components/competitors/SyncCompetitorButton";
 import { Users, LayoutGrid, Heart, MessageCircle, Play, Layers } from "lucide-react";
+import { CompetitorAvatar } from "@/components/competitors/CompetitorAvatar";
 
 export default async function CompetitorDetailPage({ params }: { params: { id: string } }) {
     const supabase = await createClient();
@@ -38,20 +39,12 @@ export default async function CompetitorDetailPage({ params }: { params: { id: s
             {/* Profile Header */}
             <div className="bg-white border border-zinc-200 rounded-xl p-8 mb-8 flex flex-col md:flex-row gap-8 items-start">
                 <div className="flex-shrink-0">
-                    <div className="w-32 h-32 rounded-full border-4 border-zinc-50 shadow-lg overflow-hidden relative bg-zinc-100">
-                        <img
-                            src={competitor.profile_pic_url || `https://unavatar.io/instagram/${competitor.username}`}
-                            alt={competitor.username}
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                                e.currentTarget.style.display = 'none';
-                                e.currentTarget.parentElement?.querySelector('.fallback-avatar')?.classList.remove('hidden');
-                            }}
-                        />
-                        <div className="fallback-avatar absolute inset-0 flex items-center justify-center bg-zinc-100 text-4xl font-bold text-zinc-400 hidden">
-                            {competitor.username[0].toUpperCase()}
-                        </div>
-                    </div>
+                    <CompetitorAvatar
+                        src={competitor.profile_pic_url}
+                        username={competitor.username}
+                        name={competitor.full_name}
+                        size="lg"
+                    />
                 </div>
 
                 <div className="flex-grow space-y-4">
