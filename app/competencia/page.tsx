@@ -46,8 +46,19 @@ export default async function CompetitorsPage() {
                                 <tr key={comp.id} className="group hover:bg-zinc-50/50 transition-colors">
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center text-xs font-bold text-zinc-400 border border-zinc-200 uppercase">
-                                                {(comp.name || comp.username || '?')[0]}
+                                            <div className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center border border-zinc-200 overflow-hidden relative">
+                                                <img
+                                                    src={comp.profile_pic_url || `https://unavatar.io/instagram/${comp.username}`}
+                                                    alt={comp.username}
+                                                    className="w-full h-full object-cover"
+                                                    onError={(e) => {
+                                                        e.currentTarget.style.display = 'none';
+                                                        e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                                                    }}
+                                                />
+                                                <div className="absolute inset-0 flex items-center justify-center bg-zinc-100 text-xs font-bold text-zinc-400 hidden">
+                                                    {(comp.name || comp.username || '?')[0]}
+                                                </div>
                                             </div>
                                             <span className="font-bold text-zinc-700">{comp.name || comp.username}</span>
                                         </div>

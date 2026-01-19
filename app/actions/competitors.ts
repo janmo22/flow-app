@@ -112,30 +112,48 @@ export async function syncCompetitorData(competitorId: string) {
         })
 
         // 1. Sync Profile Data
-        // Find latest successful run for this username on Profile Scraper
-        const profileRuns = await apifyClient.actor(PROFILE_SCRAPER_ACTOR_ID).runs().list({
+        // Try to find a recent successful run
+        let profileRuns = await apifyClient.actor(PROFILE_SCRAPER_ACTOR_ID).runs().list({
             desc: true,
             status: 'SUCCEEDED',
             limit: 1
         })
 
+        // If no recent run, trigger a new one (Active Scraping)
+        if (profileRuns.items.length === 0) {
+            console.log("No existing profile run found. Starting active scrape for:", competitor.username)
+            await apifyClient.actor(PROFILE_SCRAPER_ACTOR_ID).call({
+                usernames: [competitor.username]
+            })
+            // Fetch the run we just created
+            profileRuns = await apifyClient.actor(PROFILE_SCRAPER_ACTOR_ID).runs().list({
+                desc: true,
+                status: 'SUCCEEDED',
+                limit: 1
+            })
+        }
+
         if (profileRuns.items.length > 0) {
             const lastRun = profileRuns.items[0]
             const dataset = await apifyClient.dataset(lastRun.defaultDatasetId).listItems()
             // The dataset might contain multiple items if input had multiple usernames, find ours
-            const profileData = dataset.items.find((item: any) => item.username === competitor.username)
+            // If scraped individually, it's likely the first item, but we check username to be safe
+            const profileData = dataset.items.find((item: any) =>
+                (item.username === competitor.username) ||
+                (item.ownerUsername === competitor.username)
+            ) || dataset.items[0] // Fallback to first item if single-target scrape
 
             if (profileData) {
                 await supabase.from('competitors').update({
-                    full_name: profileData.fullName,
+                    full_name: profileData.fullName || profileData.ownerFullName,
                     biography: profileData.biography,
                     profile_pic_url: profileData.profilePicUrlHD || profileData.profilePicUrl,
                     external_url: profileData.externalUrl,
-                    is_verified: profileData.verified,
+                    is_verified: profileData.verified || profileData.isVerified,
                     is_business_account: profileData.isBusinessAccount,
-                    followers: profileData.followersCount,
-                    follows_count: profileData.followsCount,
-                    posts_count: profileData.postsCount,
+                    followers: profileData.followersCount || profileData.followers,
+                    follows_count: profileData.followsCount || profileData.follows,
+                    posts_count: profileData.postsCount || profileData.postsCount,
                     last_scraped_at: new Date().toISOString(),
                     status: 'active',
                     raw_data: profileData // Save everything!
@@ -144,6 +162,8 @@ export async function syncCompetitorData(competitorId: string) {
         }
 
         // 2. Sync Posts Data
+        // Similar logic for posts... for now we keep it passive or simple to save credits/time?
+        // Let's make it active too if missing? No, posts are heavier. Let's keep posts passive or triggered via "Analyze" button.
         const postRuns = await apifyClient.actor(POST_SCRAPER_ACTOR_ID).runs().list({
             desc: true,
             status: 'SUCCEEDED',

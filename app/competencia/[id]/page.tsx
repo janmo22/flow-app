@@ -38,17 +38,20 @@ export default async function CompetitorDetailPage({ params }: { params: { id: s
             {/* Profile Header */}
             <div className="bg-white border border-zinc-200 rounded-xl p-8 mb-8 flex flex-col md:flex-row gap-8 items-start">
                 <div className="flex-shrink-0">
-                    {competitor.profile_pic_url ? (
+                    <div className="w-32 h-32 rounded-full border-4 border-zinc-50 shadow-lg overflow-hidden relative bg-zinc-100">
                         <img
-                            src={competitor.profile_pic_url}
+                            src={competitor.profile_pic_url || `https://unavatar.io/instagram/${competitor.username}`}
                             alt={competitor.username}
-                            className="w-32 h-32 rounded-full border-4 border-zinc-50 shadow-lg"
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                                e.currentTarget.parentElement?.querySelector('.fallback-avatar')?.classList.remove('hidden');
+                            }}
                         />
-                    ) : (
-                        <div className="w-32 h-32 rounded-full bg-zinc-100 flex items-center justify-center text-4xl font-bold text-zinc-400">
+                        <div className="fallback-avatar absolute inset-0 flex items-center justify-center bg-zinc-100 text-4xl font-bold text-zinc-400 hidden">
                             {competitor.username[0].toUpperCase()}
                         </div>
-                    )}
+                    </div>
                 </div>
 
                 <div className="flex-grow space-y-4">
