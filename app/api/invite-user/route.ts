@@ -31,14 +31,17 @@ export async function POST(req: Request) {
         // 3. Invite User via Supabase Admin
         const supabaseAdmin = createAdminClient();
 
+        // Determine the redirect URL (Production vs Local)
+        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ||
+            (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+
         const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
             data: {
                 first_name: firstName,
                 last_name: lastName,
                 // Add any other user metadata here
             },
-            // You can optionally specify a redirect URL:
-            // redirectTo: 'https://your-app.com/update-password' 
+            redirectTo: `${siteUrl}/update-password`
         });
 
         if (error) {
