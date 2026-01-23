@@ -64,13 +64,13 @@ export default function LoginPage() {
             <div className="w-full max-w-[400px] relative z-10">
                 {/* Logo Section */}
                 <div className="flex flex-col items-center mb-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                    <div className="w-12 h-12 bg-[var(--color-primary)] rounded-xl flex items-center justify-center text-white mb-6 shadow-xl ring-4 ring-white">
-                        <Shield className="w-6 h-6" />
+                    <div className="w-20 h-20 mb-6 relative">
+                        <img src="/logo_v4.png" alt="Flow OS Logo" className="w-full h-full object-contain" />
                     </div>
                     <div className="flex items-center gap-2 mb-1">
-                        <span className="text-2xl font-[900] text-[var(--color-primary)] tracking-tighter uppercase italic">Flow OS</span>
+                        <span className="text-2xl font-[900] text-[var(--color-primary)] tracking-tighter uppercase italic">Crea con Flow</span>
                     </div>
-                    <p className="text-[var(--color-secondary)] text-[11px] font-bold uppercase tracking-[0.2em]">Private Infrastructure</p>
+                    <p className="text-[var(--color-secondary)] text-[11px] font-bold uppercase tracking-[0.2em]">Plataforma privada para clientes</p>
                 </div>
 
                 {/* Main Card */}

@@ -57,10 +57,10 @@ export function Sidebar() {
             {/* Header */}
             <div className="h-14 flex items-center px-4 mb-2">
                 <div className="flex items-center gap-2.5">
-                    <div className="w-6 h-6 bg-zinc-900 rounded-md flex items-center justify-center text-white font-bold text-xs shadow-sm">
-                        <span>F</span>
+                    <div className="w-8 h-8 relative">
+                        <img src="/logo_v4.png" alt="Crea con Flow" className="w-full h-full object-contain" />
                     </div>
-                    <span className="font-extrabold text-sm tracking-tight text-zinc-900">Flow OS</span>
+                    <span className="font-extrabold text-sm tracking-tight text-zinc-900">Crea con Flow</span>
                 </div>
             </div>
 
@@ -98,7 +98,7 @@ export function Sidebar() {
 
             {/* Footer */}
             <div className="p-4 border-t border-zinc-200/60 space-y-2">
-                <button className="flex items-center gap-3 w-full p-2 hover:bg-white hover:shadow-sm border border-transparent hover:border-zinc-200/60 rounded-xl transition-all group">
+                <Link href="/profile" className="flex items-center gap-3 w-full p-2 hover:bg-white hover:shadow-sm border border-transparent hover:border-zinc-200/60 rounded-xl transition-all group">
                     <div className="w-8 h-8 rounded-full bg-zinc-100 border border-zinc-200 flex items-center justify-center text-zinc-600 font-bold text-[10px] shadow-inner">
                         {session.user?.email?.[0].toUpperCase() || 'U'}
                     </div>
@@ -107,7 +107,7 @@ export function Sidebar() {
                         <p className="text-[10px] text-zinc-400 truncate font-medium">Plan Creator Pro</p>
                     </div>
                     <Settings className="w-3.5 h-3.5 text-zinc-400 group-hover:text-zinc-600 transition-colors" />
-                </button>
+                </Link>
 
                 <button
                     onClick={handleSignOut}

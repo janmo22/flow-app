@@ -6,8 +6,11 @@ import { ClientLayoutContent } from "@/components/ClientLayoutContent";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata = {
-  title: "Flow OS",
+  title: "Crea con Flow",
   description: "Operating System for Creators",
+  icons: {
+    icon: '/logo_v4.png',
+  },
 };
 
 export default function RootLayout({

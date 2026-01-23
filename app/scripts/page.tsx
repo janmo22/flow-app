@@ -7,13 +7,14 @@ import {
     List, ListOrdered, Quote, Image as ImageIcon, X,
     Layers, Lightbulb, Calendar as CalendarIcon,
     ChevronLeft, ChevronRight, Check, Video, Globe, Layout,
-    Loader2, ExternalLink, ChevronDown, PlayCircle, Target, MessageSquare
+    Loader2, ExternalLink, ChevronDown, PlayCircle, Target, MessageSquare, Highlighter
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/PageHeader";
 import { useAuth } from "@/components/AuthProvider";
 import { createClient } from "@/lib/supabase";
 import { debounce } from "lodash";
+import { useSearchParams } from "next/navigation";
 
 // --- Types ---
 type ScriptType = 'video' | 'carousel';
@@ -54,6 +55,7 @@ interface Inspiration {
     type: 'video' | 'image' | 'text' | 'link';
     category?: string;
     created_at: string;
+    script_id?: string;
 }
 
 export default function ScriptsPage() {
@@ -82,9 +84,35 @@ export default function ScriptsPage() {
         if (session?.user?.id) {
             fetchScripts();
             fetchFormats();
-            fetchInspiration();
         }
     }, [session]);
+
+    // Handle Deep Linking via Search Params
+    const searchParams = useSearchParams();
+    const initialScriptId = searchParams.get('id');
+    const hasHandledDeepLink = useRef(false);
+
+    useEffect(() => {
+        if (initialScriptId && scripts.length > 0 && !hasHandledDeepLink.current) {
+            const linkedScript = scripts.find(s => s.id === initialScriptId);
+            if (linkedScript) {
+                setActiveScript({
+                    ...linkedScript,
+                    slides: (linkedScript.slides || []).sort((a: any, b: any) => a.position - b.position)
+                });
+                hasHandledDeepLink.current = true;
+            }
+        }
+    }, [initialScriptId, scripts]);
+
+    // Fetch references when active script changes
+    useEffect(() => {
+        if (session?.user?.id && activeScript?.id) {
+            fetchScriptReferences(activeScript.id);
+        } else {
+            setInspirationItems([]);
+        }
+    }, [activeScript?.id, session?.user?.id]);
 
     const fetchScripts = async () => {
         setLoading(true);
@@ -118,12 +146,13 @@ export default function ScriptsPage() {
         if (data) setFormats(data);
     };
 
-    const fetchInspiration = async () => {
+    const fetchScriptReferences = async (scriptId: string) => {
         setLoadingInspo(true);
         const { data } = await supabase
             .from('inspiration')
             .select('*')
             .eq('user_id', session?.user?.id)
+            .eq('script_id', scriptId)
             .is('deleted_at', null)
             .order('created_at', { ascending: false });
 
@@ -412,10 +441,7 @@ export default function ScriptsPage() {
                                         <ToolbarBtn icon={Bold} onClick={() => execCmd('bold')} tooltip="Negrita" />
                                         <ToolbarBtn icon={Italic} onClick={() => execCmd('italic')} tooltip="Cursiva" />
                                         <ToolbarBtn icon={Underline} onClick={() => execCmd('underline')} tooltip="Subrayado" />
-                                        <div className="w-[1px] h-4 bg-zinc-200 mx-2" />
-                                        <ToolbarBtn icon={List} onClick={() => execCmd('insertUnorderedList')} tooltip="Lista Puntos" />
-                                        <ToolbarBtn icon={ListOrdered} onClick={() => execCmd('insertOrderedList')} tooltip="Lista Numérica" />
-                                        <ToolbarBtn icon={Quote} onClick={() => execCmd('formatBlock', 'blockquote')} tooltip="Cita" />
+                                        <ColorPickerBtn onSelect={(color: string) => execCmd('hiliteColor', color)} />
                                     </div>
                                     <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-white">
                                         {activeScript.type === 'video' ? (
@@ -484,44 +510,54 @@ export default function ScriptsPage() {
                             ) : (
                                 // Strategy View (Refactored)
                                 <div className="flex-1 overflow-y-auto bg-[#F8F9FA] p-8 custom-scrollbar">
-                                    <div className="max-w-3xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6 pb-12 animate-in slide-in-from-bottom-4 duration-500">
-                                        <div className="bg-white border border-zinc-200/60 rounded-3xl p-8 relative overflow-hidden group shadow-sm hover:shadow-md transition-all">
-                                            <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
-                                                <Lightbulb className="w-16 h-16 text-blue-500 rotate-12" />
+                                    <div className="max-w-4xl mx-auto flex flex-col gap-8 pb-12 animate-in slide-in-from-bottom-4 duration-500">
+
+                                        {/* Strategic Message - Prominent */}
+                                        <div className="bg-white border border-zinc-200 rounded-[28px] p-8 relative overflow-hidden group shadow-sm hover:shadow-md transition-all">
+                                            <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity pointer-events-none">
+                                                <Target className="w-32 h-32 text-blue-600 rotate-12" />
                                             </div>
                                             <div className="relative z-10 flex flex-col h-full">
-                                                <h3 className="text-sm font-black text-zinc-900 uppercase tracking-wide mb-2 flex items-center gap-2">
-                                                    <Target className="w-4 h-4 text-blue-500" />
+                                                <h3 className="text-lg font-black text-zinc-900 uppercase tracking-tight mb-2 flex items-center gap-3">
+                                                    <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                                                        <Target className="w-5 h-5" />
+                                                    </div>
                                                     Mensaje Estratégico
                                                 </h3>
-                                                <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider mb-6">El "Por Qué" de este contenido</p>
+                                                <p className="text-xs text-zinc-500 font-medium mb-6 ml-1">Define el propósito psicológico y emocional único de esta pieza. ¿Qué debe sentir la audiencia?</p>
                                                 <textarea
-                                                    className="flex-1 w-full border border-transparent hover:border-zinc-100 bg-zinc-50/50 rounded-xl p-4 text-sm font-medium text-zinc-700 placeholder:text-zinc-300 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/10 focus:bg-white transition-all leading-relaxed"
-                                                    placeholder="Define el propósito psicológico y emocional de esta pieza..."
+                                                    className="w-full min-h-[140px] border border-zinc-100 hover:border-zinc-200 bg-zinc-50/50 focus:bg-white rounded-2xl p-6 text-lg font-medium text-zinc-800 placeholder:text-zinc-300 resize-none focus:outline-none focus:ring-4 focus:ring-blue-500/5 transition-all leading-relaxed shadow-sm"
+                                                    placeholder="Escribe el mensaje central aquí..."
                                                     value={activeScript.strategy_message}
                                                     onChange={(e) => updateActiveScript({ strategy_message: e.target.value })}
                                                 />
                                             </div>
                                         </div>
 
-                                        <div className="bg-white border border-zinc-200/60 rounded-3xl p-8 relative overflow-hidden group shadow-sm hover:shadow-md transition-all">
-                                            <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
-                                                <ListOrdered className="w-16 h-16 text-purple-500 -rotate-12" />
+                                        {/* Key Points - Bullet List */}
+                                        <div className="bg-white border border-zinc-200 rounded-[28px] p-8 relative overflow-hidden group shadow-sm hover:shadow-md transition-all">
+                                            <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity pointer-events-none">
+                                                <ListOrdered className="w-32 h-32 text-purple-600 -rotate-12" />
                                             </div>
                                             <div className="relative z-10 flex flex-col h-full">
-                                                <h3 className="text-sm font-black text-zinc-900 uppercase tracking-wide mb-2 flex items-center gap-2">
-                                                    <List className="w-4 h-4 text-purple-500" />
+                                                <h3 className="text-lg font-black text-zinc-900 uppercase tracking-tight mb-2 flex items-center gap-3">
+                                                    <div className="p-2 bg-purple-50 text-purple-600 rounded-lg">
+                                                        <List className="w-5 h-5" />
+                                                    </div>
                                                     Puntos Clave
                                                 </h3>
-                                                <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider mb-6">Estructura del argumento</p>
-                                                <textarea
-                                                    className="flex-1 w-full border border-transparent hover:border-zinc-100 bg-zinc-50/50 rounded-xl p-4 text-sm font-medium text-zinc-700 placeholder:text-zinc-300 resize-none focus:outline-none focus:ring-2 focus:ring-purple-500/10 focus:bg-white transition-all leading-relaxed"
-                                                    placeholder="• Punto 1: Conecta con el problema..."
-                                                    value={activeScript.strategy_bullets}
-                                                    onChange={(e) => updateActiveScript({ strategy_bullets: e.target.value })}
-                                                />
+                                                <p className="text-xs text-zinc-500 font-medium mb-6 ml-1">Estructura del argumento. Usa atajos: "<b>1.</b> " para lista numerada, "<b>-</b> " para bullets.</p>
+                                                <div className="min-h-[200px] border border-zinc-100 hover:border-zinc-200 bg-zinc-50/50 focus-within:bg-white rounded-2xl p-6 focus-within:ring-4 focus-within:ring-purple-500/5 transition-all shadow-sm">
+                                                    <RichTextEditor
+                                                        html={activeScript.strategy_bullets}
+                                                        onChange={(html: string) => updateActiveScript({ strategy_bullets: html })}
+                                                        className="text-base leading-relaxed text-zinc-700 min-h-[180px]"
+                                                        placeholder="• Punto 1: Contexto..."
+                                                    />
+                                                </div>
                                             </div>
                                         </div>
+
                                     </div>
                                 </div>
                             )}
@@ -558,7 +594,7 @@ export default function ScriptsPage() {
                                             accept="image/*"
                                             onChange={async (e) => {
                                                 const file = e.target.files?.[0];
-                                                if (!file || !session?.user?.id) return;
+                                                if (!file || !session?.user?.id || !activeScript?.id) return;
                                                 setLoadingInspo(true);
                                                 try {
                                                     const path = `${session.user.id}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9]/g, '_')}`;
@@ -568,11 +604,12 @@ export default function ScriptsPage() {
                                                         const { data: { publicUrl } } = supabase.storage.from('references').getPublicUrl(path);
                                                         await supabase.from('inspiration').insert({
                                                             user_id: session.user.id,
+                                                            script_id: activeScript.id,
                                                             title: file.name,
                                                             image_url: publicUrl,
                                                             type: 'image'
                                                         });
-                                                        await fetchInspiration();
+                                                        await fetchScriptReferences(activeScript.id);
                                                     }
                                                 } finally {
                                                     setLoadingInspo(false);
@@ -715,25 +752,75 @@ function RichTextEditor({ html, onChange, className, placeholder }: any) {
     const editorRef = useRef<HTMLDivElement>(null);
     useEffect(() => {
         if (editorRef.current && editorRef.current.innerHTML !== html) {
-            // Only update if significantly different to avoid cursor jumps
-            // Simple interaction check might be needed or just brute force
             if (document.activeElement !== editorRef.current) {
-                editorRef.current.innerHTML = html;
+                editorRef.current.innerHTML = html || '';
             }
         }
     }, [html]);
+
+
 
     return (
         <div
             ref={editorRef}
             contentEditable
             onInput={() => editorRef.current && onChange(editorRef.current.innerHTML)}
+
             className={cn(
-                "outline-none empty:before:content-[attr(data-placeholder)] empty:before:text-zinc-300 focus:empty:before:text-zinc-200 transition-all cursor-text",
+                "pro-editor outline-none empty:before:content-[attr(data-placeholder)] empty:before:text-zinc-300 focus:empty:before:text-zinc-200 transition-all cursor-text",
                 className
             )}
             data-placeholder={placeholder}
             spellCheck={false}
         />
+    );
+}
+
+function ColorPickerBtn({ onSelect }: { onSelect: (color: string) => void }) {
+    const [isOpen, setIsOpen] = useState(false);
+    const colors = [
+        { name: 'Amarillo', value: '#fef08a' }, // yellow-200
+        { name: 'Verde', value: '#bbf7d0' },    // green-200
+        { name: 'Azul', value: '#bfdbfe' },     // blue-200
+        { name: 'Rosa', value: '#fbcfe8' },     // pink-200
+        { name: 'Morado', value: '#e9d5ff' },   // purple-200
+        { name: 'Sin Color', value: 'transparent' }
+    ];
+
+    return (
+        <div className="relative">
+            <button
+                onMouseDown={(e) => { e.preventDefault(); setIsOpen(!isOpen); }}
+                className={cn(
+                    "p-2 rounded-lg text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 transition-all active:scale-90",
+                    isOpen ? "bg-zinc-100 text-zinc-900" : "text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100"
+                )}
+                title="Resaltar Color"
+            >
+                <Highlighter className="w-4 h-4" strokeWidth={2.5} />
+            </button>
+            {isOpen && (
+                <>
+                    <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
+                    <div className="absolute top-full left-0 mt-2 p-2 bg-white border border-zinc-100 rounded-xl shadow-xl z-20 flex gap-1 animate-in zoom-in-95 duration-200 min-w-max">
+                        {colors.map(c => (
+                            <button
+                                key={c.value}
+                                onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    onSelect(c.value);
+                                    setIsOpen(false);
+                                }}
+                                className="w-6 h-6 rounded-full border border-zinc-200 hover:scale-110 transition-transform relative"
+                                style={{ backgroundColor: c.value === 'transparent' ? 'white' : c.value }}
+                                title={c.name}
+                            >
+                                {c.value === 'transparent' && <div className="absolute inset-0 m-auto w-full h-[1px] bg-red-500 rotate-45" />}
+                            </button>
+                        ))}
+                    </div>
+                </>
+            )}
+        </div>
     );
 }

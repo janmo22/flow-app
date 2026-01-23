@@ -40,7 +40,7 @@ export function ClientLayoutContent({ children }: { children: React.ReactNode })
             <div className="min-h-screen bg-[var(--color-background)] flex items-center justify-center">
                 <div className="flex flex-col items-center gap-4">
                     <div className="w-8 h-8 border-4 border-[var(--color-brand)] border-t-transparent rounded-full animate-spin" />
-                    <p className="text-[10px] font-bold text-[var(--color-tertiary)] uppercase tracking-widest">Iniciando Flow OS...</p>
+                    <p className="text-[10px] font-bold text-[var(--color-tertiary)] uppercase tracking-widest">Iniciando Crea con Flow...</p>
                 </div>
             </div>
         );

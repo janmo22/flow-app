@@ -55,12 +55,12 @@ export default function UpdatePasswordPage() {
             <div className="w-full max-w-[400px] relative z-10">
                 {/* Logo Section */}
                 <div className="flex flex-col items-center mb-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                    <div className="w-12 h-12 bg-zinc-900 rounded-xl flex items-center justify-center text-white mb-6 shadow-xl ring-4 ring-white">
-                        <Shield className="w-6 h-6" />
+                    <div className="w-16 h-16 mb-6 relative">
+                        <img src="/logo_v4.png" alt="Crea con Flow" className="w-full h-full object-contain" />
                     </div>
                     <div className="flex items-center gap-2 mb-1">
                         <Sparkles className="w-4 h-4 text-blue-600" />
-                        <h1 className="text-2xl font-[900] text-zinc-900 tracking-tighter uppercase italic">Flow OS</h1>
+                        <h1 className="text-2xl font-[900] text-zinc-900 tracking-tighter uppercase italic">Crea con Flow</h1>
                     </div>
                     <p className="text-zinc-500 text-[11px] font-bold uppercase tracking-[0.2em]">Configuración de Cuenta</p>
                 </div>
